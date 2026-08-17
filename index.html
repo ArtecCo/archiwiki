@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ArchiWiki</title>
+    
+    <!-- Meta Tags for SEO & PWA Styling -->
+    <meta name="description" content="A highly secure, offline-first, minimalist Markdown note-taking app with client-side encryption and Obsidian-style wiki-linking." />
+    <meta name="theme-color" content="#F5F2EB" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ArchiWiki" />
+
+    <!-- Favicon and Touch Icons -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    
+    <!-- Google Serif Font Web Integration -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
+    
+    <!-- Web App Manifest Link (handled dynamically by vite-plugin-pwa) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+  </head>
+  <body class="bg-[#F5F2EB] text-[#202122] antialiased select-none">
+    <!-- Main Mount Target for React App -->
+    <div id="root"></div>
+
+    <!-- Vite's SPA Script Entry Pointer -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
