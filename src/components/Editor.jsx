@@ -708,10 +708,226 @@ export default function Editor({
      PDF
   -------------------------------------------------- */
 
-  const triggerPdfPrint = () => {
+  const escapeHtml = (value = "") => {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
 
-    window.print();
+  const triggerPdfPrint = () => {
+  if (!note) return;
+
+  const renderedContent = parseWikiLinks(body);
+
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+
+  if (!printWindow) {
+    alert("Please allow pop-ups to export the PDF.");
+    return;
+  }
+
+  printWindow.document.open();
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>${escapeHtml(title || "Untitled Note")}</title>
+
+        <style>
+          @page {
+            size: A4;
+            margin: 22mm 20mm 22mm 20mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          html,
+          body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: #202122;
+          }
+
+          body {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 12pt;
+            line-height: 1.75;
+          }
+
+          .document {
+            width: 100%;
+            max-width: 100%;
+          }
+
+          h1 {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 28pt;
+            line-height: 1.2;
+            margin: 0 0 24px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #d4d4d4;
+            color: #171717;
+          }
+
+          h2 {
+            font-size: 20pt;
+            margin-top: 28px;
+            margin-bottom: 12px;
+          }
+
+          h3 {
+            font-size: 16pt;
+            margin-top: 24px;
+            margin-bottom: 10px;
+          }
+
+          p {
+            margin: 0 0 14px;
+          }
+
+          ul,
+          ol {
+            margin: 12px 0 16px 28px;
+          }
+
+          li {
+            margin-bottom: 5px;
+          }
+
+          blockquote {
+            margin: 18px 0;
+            padding: 8px 18px;
+            border-left: 4px solid #a3a3a3;
+            color: #525252;
+          }
+
+          code {
+            font-family: "SFMono-Regular", Consolas, monospace;
+            font-size: 0.9em;
+            background: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+          }
+
+          pre {
+            background: #f5f5f5;
+            padding: 14px;
+            border-radius: 6px;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+          }
+
+          pre code {
+            background: transparent;
+            padding: 0;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 18px 0;
+          }
+
+          th,
+          td {
+            border: 1px solid #d4d4d4;
+            padding: 7px 10px;
+            text-align: left;
+          }
+
+          th {
+            background: #f5f5f5;
+          }
+
+          a {
+            color: #202122;
+            text-decoration: underline;
+          }
+
+          img {
+            max-width: 100%;
+            height: auto;
+          }
+
+          .wiki-link {
+            color: #202122;
+            font-weight: 600;
+            text-decoration: underline;
+          }
+
+          .document-footer {
+            margin-top: 40px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e5e5;
+            color: #737373;
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+          }
+
+          @media print {
+            body {
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
+
+            .document {
+              break-inside: auto;
+            }
+
+            h1,
+            h2,
+            h3 {
+              break-after: avoid;
+            }
+
+            pre,
+            blockquote,
+            table {
+              break-inside: avoid;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        <main class="document">
+          <h1>${escapeHtml(title || "Untitled Note")}</h1>
+
+          <div class="content">
+            ${renderedContent}
+          </div>
+
+          <div class="document-footer">
+            Exported from Scribe
+          </div>
+        </main>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+
+  // Wait until the new document has actually rendered.
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+
+      // Give the browser time to finish the print operation.
+      setTimeout(() => {
+        printWindow.close();
+      }, 1000);
+    }, 300);
   };
+};
 
 
   /* --------------------------------------------------
