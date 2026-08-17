@@ -19,6 +19,27 @@ import GraphView from "./components/GraphView";
 import { LogOut, Share2, Menu } from "lucide-react";
 
 export default function App() {
+
+  useEffect(() => {
+  const loader = document.getElementById(
+    "archiwiki-loader"
+  );
+
+  if (!loader) return;
+
+  const timer = setTimeout(() => {
+    loader.style.opacity = "0";
+    loader.style.visibility = "hidden";
+
+    setTimeout(() => {
+      loader.remove();
+    }, 450);
+  }, 350);
+
+  return () => clearTimeout(timer);
+}, []);
+
+
   const { user, masterKey, login, registerWithInvite, logout } = useAuth();
   
   // Auth Form parameters
@@ -36,10 +57,16 @@ export default function App() {
   const [newNoteId, setNewNoteId] = useState(null);
   const [pendingNotes, setPendingNotes] = useState([]);
   const [fontSize, setFontSize] = useState(16);
-  const [theme, setTheme] = useState("beige"); // beige | wikipedia | charcoal
+  const [theme, setTheme] = useState(() => {
+  return localStorage.getItem("archiwiki-theme") || "beige";
+}); // beige | wikipedia | charcoal
   const [activeTab, setActiveTab] = useState("editor"); // editor | graph
   const [dialog, setDialog] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+  localStorage.setItem("archiwiki-theme", theme);
+}, [theme]);
 
   useEffect(() => {
   if (!user) {
@@ -313,6 +340,31 @@ const handleCreateNote = async (folderId = null) => {
     if (!folderId) return "Root";
     const fold = folders.find(f => f.id === folderId);
     return fold ? `${getFolderPath(fold.parentId)}/${fold.name}` : "Root";
+  };
+
+  // Build the visible breadcrumb for the currently open article.
+  // Includes every parent folder and subfolder, while omitting Root.
+  const getArticleBreadcrumb = (folderId) => {
+    if (!folderId) return "";
+
+    const parts = [];
+    const visited = new Set();
+    let currentId = folderId;
+
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+
+      const folder = folders.find(
+        (item) => item.id === currentId
+      );
+
+      if (!folder) break;
+
+      parts.unshift(folder.name);
+      currentId = folder.parentId || null;
+    }
+
+    return parts.join(" / ");
   };
 
   const handleCloseNote = () => {
@@ -643,6 +695,9 @@ const formattedWritingSince = writingSince
   folderCount={folderCount}
   subfolderCount={subfolderCount}
   writingSince={formattedWritingSince}
+  breadcrumb={getArticleBreadcrumb(
+    decryptedNotes.find(n => n.id === activeNoteId)?.folderId
+  )}
   onSaveNote={handleSaveNote}
   notesPool={decryptedNotes}
   fontSize={fontSize}
