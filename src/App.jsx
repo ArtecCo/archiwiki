@@ -217,7 +217,7 @@ const handleCreateNote = async (folderId = null) => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] font-serif p-6">
         <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8">
-          <h2 className="text-2xl font-bold tracking-wider text-center mb-1">SCRIBE</h2>
+          <h2 className="text-2xl font-bold tracking-wider text-center mb-1">ArchiWiki</h2>
           <p className="text-xs text-neutral-400 text-center uppercase tracking-widest mb-6">Encrypted Ledger Mode</p>
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
