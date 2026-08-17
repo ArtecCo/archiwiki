@@ -99,26 +99,26 @@ export default function Sidebar({
             {childFolders.map(child => renderFolderNode(child.id, level + 1))}
             {childNotes.map(note => (
               <div
-                key={note.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, note.id, "note")}
-                onClick={() => onSelectNote(note.id)}
-                className={`flex items-center justify-between py-1 px-3 ml-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
-                  activeNoteId === note.id 
-                    ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100" 
-                    : "text-neutral-600 dark:text-neutral-400"
-                }`}
-              >
+  key={note.id}
+  draggable
+  onDragStart={(e) => handleDragStart(e, note.id, "note")}
+  onClick={() => onSelectNote(note.id)}
+  className={`group flex items-center justify-between py-1 px-3 ml-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
+    activeNoteId === note.id
+      ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100"
+      : "text-neutral-600 dark:text-neutral-400"
+  }`}
+>
                 <div className="flex items-center gap-1.5 truncate">
                   <FileText size={13} className="text-neutral-400" />
                   <span className="truncate max-w-[140px]">{note.title || "Untitled"}</span>
                 </div>
                 <button
-                  onClick={(e) => { e.stopPropagation(); onDeleteNote(note.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                >
-                  <Trash2 size={12} />
-                </button>
+  onClick={(e) => { e.stopPropagation(); onDeleteNote(note.id); }}
+  className="opacity-0 group-hover:opacity-100 p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+>
+  <Trash2 size={12} />
+</button>
               </div>
             ))}
           </div>
@@ -182,15 +182,31 @@ export default function Sidebar({
           <div>
             <h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-2">Search Results</h3>
             {filteredNotes.map(note => (
-              <div
-                key={note.id}
-                onClick={() => onSelectNote(note.id)}
-                className="flex items-center gap-1.5 py-1 px-3 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm text-neutral-600 dark:text-neutral-400"
-              >
-                <FileText size={13} />
-                <span className="truncate">{note.title}</span>
-              </div>
-            ))}
+  <div
+    key={note.id}
+    onClick={() => onSelectNote(note.id)}
+    className="group flex items-center justify-between py-1 px-3 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm text-neutral-600 dark:text-neutral-400"
+  >
+    <div className="flex items-center gap-1.5 truncate">
+      <FileText size={13} />
+      <span className="truncate">
+        {note.title || "Untitled"}
+      </span>
+    </div>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onDeleteNote(note.id);
+      }}
+      title="Delete note"
+      aria-label={`Delete ${note.title || "note"}`}
+      className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-opacity"
+    >
+      <Trash2 size={13} />
+    </button>
+  </div>
+))}
           </div>
         ) : (
           <>
@@ -201,21 +217,37 @@ export default function Sidebar({
               <div className="mt-4 border-t border-neutral-100 dark:border-neutral-800 pt-2">
                 <h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-1.5">Unsorted Notes</h3>
                 {rootNotes.map(note => (
-                  <div
-                    key={note.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, note.id, "note")}
-                    onClick={() => onSelectNote(note.id)}
-                    className={`flex items-center gap-1.5 py-1 px-3 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
-                      activeNoteId === note.id 
-                        ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100" 
-                        : "text-neutral-600 dark:text-neutral-400"
-                    }`}
-                  >
-                    <FileText size={13} className="text-neutral-400" />
-                    <span className="truncate">{note.title || "Untitled"}</span>
-                  </div>
-                ))}
+  <div
+    key={note.id}
+    draggable
+    onDragStart={(e) => handleDragStart(e, note.id, "note")}
+    onClick={() => onSelectNote(note.id)}
+    className={`group flex items-center justify-between py-1 px-3 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
+      activeNoteId === note.id
+        ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100"
+        : "text-neutral-600 dark:text-neutral-400"
+    }`}
+  >
+    <div className="flex items-center gap-1.5 truncate">
+      <FileText size={13} className="text-neutral-400" />
+      <span className="truncate">
+        {note.title || "Untitled"}
+      </span>
+    </div>
+
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onDeleteNote(note.id);
+      }}
+      title="Delete note"
+      aria-label={`Delete ${note.title || "note"}`}
+      className="opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-opacity"
+    >
+      <Trash2 size={13} />
+    </button>
+  </div>
+))}
               </div>
             )}
           </>
