@@ -335,14 +335,16 @@ export default function Sidebar({
     (note) => !note.folderId || !folderIds.has(note.folderId)
   );
 
-  const filteredNotes = notes.filter((n) => {
-    const query = searchQuery.toLowerCase();
+  const searchTerm = searchQuery.trim().toLowerCase();
 
-    return (
-      n.title?.toLowerCase().includes(query) ||
-      n.body?.toLowerCase().includes(query)
-    );
-  });
+const filteredNotes = notes.filter((note) =>
+  note.title?.toLowerCase().includes(searchTerm) ||
+  note.body?.toLowerCase().includes(searchTerm)
+);
+
+const filteredFolders = folders.filter((folder) =>
+  folder.name?.toLowerCase().includes(searchTerm)
+);
 
   // -----------------------------
   // Render
