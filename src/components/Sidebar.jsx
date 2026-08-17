@@ -80,23 +80,6 @@ export default function Sidebar({
 
   const colors = themeClasses[theme] || themeClasses.beige;
 
-  // Show the contents of newly loaded folders immediately. Existing choices
-  // are retained, so manually collapsed folders stay collapsed.
-  useEffect(() => {
-    setExpandedFolders((previous) => {
-      let hasNewFolder = false;
-      const next = { ...previous };
-
-      folders.forEach((folder) => {
-        if (!(folder.id in next)) {
-          next[folder.id] = true;
-          hasNewFolder = true;
-        }
-      });
-
-      return hasNewFolder ? next : previous;
-    });
-  }, [folders]);
 
   const toggleFolder = (id) => {
     setExpandedFolders((prev) => ({
