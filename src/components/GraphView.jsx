@@ -1,8 +1,14 @@
 import React, { useEffect, useRef } from "react";
 import { BookOpen } from "lucide-react";
 
-export default function GraphView({ notes, onNavigateToNote }) {
+export default function GraphView({ notes, onNavigateToNote, theme = "beige" }) {
   const canvasRef = useRef(null);
+
+  const graphTheme = {
+    beige: { page: "bg-[#F5F2EB] text-[#202122]", panel: "bg-white border-neutral-200", edge: "#d8cdbA", node: "#5e513d", label: "#3f372b" },
+    wikipedia: { page: "bg-[#F8F9FA] text-[#202122]", panel: "bg-white border-neutral-200", edge: "#c8ccd1", node: "#3366cc", label: "#202122" },
+    charcoal: { page: "bg-neutral-900 text-neutral-100", panel: "bg-neutral-950 border-neutral-700", edge: "#404040", node: "#93c5fd", label: "#f5f5f5" }
+  }[theme] || {};
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -86,7 +92,7 @@ export default function GraphView({ notes, onNavigateToNote }) {
       ctx.clearRect(0, 0, width, height);
 
       // Draw Connection Threads
-      ctx.strokeStyle = "#e5e5e5";
+      ctx.strokeStyle = graphTheme.edge;
       ctx.lineWidth = 1;
       links.forEach(link => {
         ctx.beginPath();
@@ -97,13 +103,13 @@ export default function GraphView({ notes, onNavigateToNote }) {
 
       // Draw Core Nodes
       nodes.forEach(node => {
-        ctx.fillStyle = "#202122";
+        ctx.fillStyle = graphTheme.node;
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2);
         ctx.fill();
 
         // Node Title Labels
-        ctx.fillStyle = "#202122";
+        ctx.fillStyle = graphTheme.label;
         ctx.font = "11px Georgia, serif";
         ctx.textAlign = "center";
         ctx.fillText(node.title, node.x, node.y - 10);
@@ -112,16 +118,16 @@ export default function GraphView({ notes, onNavigateToNote }) {
 
     const animation = setInterval(render, 30);
     return () => clearInterval(animation);
-  }, [notes]);
+  }, [notes, theme]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F5F2EB] text-[#202122] h-full p-8">
-      <div className="flex items-center gap-2 mb-6 border-b border-neutral-300 pb-4">
+    <div className={`flex-1 flex flex-col h-full p-8 ${graphTheme.page}`}>
+      <div className="flex items-center gap-2 mb-6 border-b border-current/20 pb-4">
         <BookOpen size={20} />
-        <h2 className="text-xl font-serif font-bold">Manuscript Network Map</h2>
+        <h2 className="text-xl font-serif font-bold">Article Network Map</h2>
       </div>
       <p className="text-xs italic text-neutral-500 mb-4">A visualization of local references and links. Drag and drop connections or click notes directly inside editor viewports.</p>
-      <div className="flex-1 bg-white border border-neutral-200 rounded relative overflow-hidden min-h-[400px]">
+      <div className={`flex-1 border rounded relative overflow-hidden min-h-[400px] ${graphTheme.panel}`}>
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
       </div>
     </div>
