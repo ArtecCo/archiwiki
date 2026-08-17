@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Folder,
   FileText,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 export default function Sidebar({
+  theme = "beige",
   folders,
   notes,
   activeNoteId,
@@ -25,6 +26,77 @@ export default function Sidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
+
+  const themeClasses = {
+    beige: {
+      shell: "border-[#E6E1D3] bg-[#EFEADF] text-neutral-700",
+      brand: "border-[#E6E1D3]",
+      brandText: "text-neutral-900",
+      itemHover: "hover:bg-[#E8E1D2]",
+      activeItem: "bg-[#E2D9C8] font-medium text-neutral-900",
+      idleItem: "text-neutral-600",
+      folderText: "text-neutral-800",
+      folderFill: "fill-[#E2D9C8]",
+      button: "border-[#D8CDBA] hover:bg-[#E8E1D2]",
+      primaryButton: "bg-neutral-900 text-neutral-100 hover:bg-neutral-800",
+      input: "bg-[#F5F2EB] border-[#D8CDBA] focus:ring-neutral-400",
+      divider: "border-[#E6E1D3]",
+      menu: "bg-[#F5F2EB] border-[#D8CDBA]",
+      menuText: "text-neutral-700"
+    },
+    wikipedia: {
+      shell: "border-neutral-200 bg-neutral-50 text-neutral-700",
+      brand: "border-neutral-200",
+      brandText: "text-neutral-900",
+      itemHover: "hover:bg-neutral-100",
+      activeItem: "bg-neutral-200/70 font-medium text-neutral-900",
+      idleItem: "text-neutral-600",
+      folderText: "text-neutral-800",
+      folderFill: "fill-neutral-200",
+      button: "border-neutral-300 hover:bg-neutral-100",
+      primaryButton: "bg-neutral-900 text-neutral-100 hover:bg-neutral-800",
+      input: "bg-white border-neutral-200 focus:ring-neutral-400",
+      divider: "border-neutral-100",
+      menu: "bg-white border-neutral-200",
+      menuText: "text-neutral-700"
+    },
+    charcoal: {
+      shell: "border-neutral-800 bg-neutral-950 text-neutral-300",
+      brand: "border-neutral-800",
+      brandText: "text-neutral-100",
+      itemHover: "hover:bg-neutral-800",
+      activeItem: "bg-neutral-800/80 font-medium text-neutral-100",
+      idleItem: "text-neutral-400",
+      folderText: "text-neutral-200",
+      folderFill: "fill-transparent",
+      button: "border-neutral-700 hover:bg-neutral-800",
+      primaryButton: "bg-neutral-100 text-neutral-900 hover:bg-neutral-200",
+      input: "bg-neutral-900 border-neutral-800 focus:ring-neutral-500",
+      divider: "border-neutral-800",
+      menu: "bg-neutral-900 border-neutral-800",
+      menuText: "text-neutral-200"
+    }
+  };
+
+  const colors = themeClasses[theme] || themeClasses.beige;
+
+  // Show the contents of newly loaded folders immediately. Existing choices
+  // are retained, so manually collapsed folders stay collapsed.
+  useEffect(() => {
+    setExpandedFolders((previous) => {
+      let hasNewFolder = false;
+      const next = { ...previous };
+
+      folders.forEach((folder) => {
+        if (!(folder.id in next)) {
+          next[folder.id] = true;
+          hasNewFolder = true;
+        }
+      });
+
+      return hasNewFolder ? next : previous;
+    });
+  }, [folders]);
 
   const toggleFolder = (id) => {
     setExpandedFolders((prev) => ({
@@ -50,6 +122,10 @@ export default function Sidebar({
 
   const handleDrop = (e, targetFolderId) => {
     e.preventDefault();
+    // A nested folder is also inside each ancestor's drop zone. Prevent the
+    // event from bubbling so the note is moved only to the folder it was
+    // dropped on, rather than being moved again to a parent folder.
+    e.stopPropagation();
 
     try {
       const data = JSON.parse(
@@ -131,7 +207,7 @@ export default function Sidebar({
         {/* Folder Header */}
 
         <div
-          className="group flex items-center justify-between py-1 px-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer border border-transparent"
+          className={`group flex items-center justify-between py-1 px-2 ${colors.itemHover} rounded cursor-pointer border border-transparent`}
           onClick={() => toggleFolder(folderId)}
           onContextMenu={(e) =>
             showContextMenu(e, folderId)
@@ -141,7 +217,7 @@ export default function Sidebar({
             handleDragStart(e, folderId, "folder")
           }
         >
-          <div className="flex items-center gap-1.5 text-neutral-800 dark:text-neutral-200 min-w-0">
+          <div className={`flex items-center gap-1.5 ${colors.folderText} min-w-0`}>
             {isExpanded ? (
               <ChevronDown
                 size={14}
@@ -156,7 +232,7 @@ export default function Sidebar({
 
             <Folder
               size={14}
-              className="text-neutral-500 fill-neutral-200 dark:fill-transparent shrink-0"
+              className={`text-neutral-500 ${colors.folderFill} shrink-0`}
             />
 
             <span className="text-sm font-medium truncate max-w-[130px]">
@@ -168,10 +244,14 @@ export default function Sidebar({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                setExpandedFolders((prev) => ({
+                  ...prev,
+                  [folderId]: true
+                }));
                 onCreateNote(folderId);
               }}
               title="New note in folder"
-              className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded text-neutral-500"
+              className={`p-1 ${colors.itemHover} rounded text-neutral-500`}
             >
               <Plus size={12} />
             </button>
@@ -181,7 +261,7 @@ export default function Sidebar({
         {/* Folder Children */}
 
         {isExpanded && (
-          <div className="border-l border-neutral-200 dark:border-neutral-800 ml-3.5 my-0.5">
+          <div className={`border-l ${colors.divider} ml-3.5 my-0.5`}>
             {childFolders.map((child) =>
               renderFolderNode(
                 child.id,
@@ -203,10 +283,10 @@ export default function Sidebar({
                 onClick={() =>
                   onSelectNote(note.id)
                 }
-                className={`group flex items-center justify-between gap-2 py-1 px-3 ml-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
+                className={`group flex items-center justify-between gap-2 py-1 px-3 ml-2 ${colors.itemHover} rounded cursor-pointer text-sm ${
                   activeNoteId === note.id
-                    ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100"
-                    : "text-neutral-600 dark:text-neutral-400"
+                    ? colors.activeItem
+                    : colors.idleItem
                 }`}
               >
                 <div className="flex items-center gap-1.5 truncate min-w-0">
@@ -250,8 +330,9 @@ export default function Sidebar({
     (f) => !f.parentId
   );
 
+  const folderIds = new Set(folders.map((folder) => folder.id));
   const rootNotes = notes.filter(
-    (n) => !n.folderId
+    (note) => !note.folderId || !folderIds.has(note.folderId)
   );
 
   const filteredNotes = notes.filter((n) => {
@@ -269,14 +350,14 @@ export default function Sidebar({
 
   return (
     <div
-      className="w-64 h-full flex flex-col border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 select-none text-neutral-700 dark:text-neutral-300"
+      className={`w-64 h-full flex flex-col border-r select-none ${colors.shell}`}
       onClick={closeContextMenu}
     >
       {/* Brand */}
 
-      <div className="p-4 border-b border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-semibold tracking-wider font-serif text-neutral-900 dark:text-neutral-100">
-          SCRIBE
+      <div className={`p-4 border-b ${colors.brand}`}>
+        <h2 className={`text-lg font-semibold tracking-wider font-archi ${colors.brandText}`}>
+          ArchiWiki
         </h2>
       </div>
 
@@ -288,7 +369,7 @@ export default function Sidebar({
           onClick={() =>
             onCreateFolder(null)
           }
-          className="flex-1 py-1 px-2 flex items-center justify-center gap-1.5 text-xs font-medium border border-neutral-300 dark:border-neutral-700 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          className={`flex-1 py-1 px-2 flex items-center justify-center gap-1.5 text-xs font-medium border rounded ${colors.button}`}
         >
           <Folder size={12} />
           + Folder
@@ -299,7 +380,7 @@ export default function Sidebar({
           onClick={() =>
             onCreateNote(null)
           }
-          className="flex-1 py-1 px-2 flex items-center justify-center gap-1.5 text-xs font-medium bg-neutral-900 dark:bg-neutral-100 text-neutral-100 dark:text-neutral-900 rounded hover:bg-neutral-800 dark:hover:bg-neutral-200"
+          className={`flex-1 py-1 px-2 flex items-center justify-center gap-1.5 text-xs font-medium rounded ${colors.primaryButton}`}
         >
           <FileText size={12} />
           + Note
@@ -320,7 +401,7 @@ export default function Sidebar({
             setSearchQuery(e.target.value)
           }
           placeholder="Search encrypted notes..."
-          className="w-full text-xs pl-8 pr-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded focus:outline-none focus:ring-1 focus:ring-neutral-400"
+          className={`w-full text-xs pl-8 pr-3 py-1.5 border rounded focus:outline-none focus:ring-1 ${colors.input}`}
         />
       </div>
 
@@ -344,10 +425,10 @@ export default function Sidebar({
                   onClick={() =>
                     onSelectNote(note.id)
                   }
-                  className={`group flex items-center justify-between gap-2 py-1 px-3 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
+                  className={`group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
                     activeNoteId === note.id
-                      ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100"
-                      : "text-neutral-600 dark:text-neutral-400"
+                      ? colors.activeItem
+                      : colors.idleItem
                   }`}
                 >
                   <div className="flex items-center gap-1.5 truncate min-w-0">
@@ -388,7 +469,7 @@ export default function Sidebar({
             {/* Root Notes */}
 
             {rootNotes.length > 0 && (
-              <div className="mt-4 border-t border-neutral-100 dark:border-neutral-800 pt-2">
+              <div className={`mt-4 border-t ${colors.divider} pt-2`}>
                 <h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-1.5">
                   Unsorted Notes
                 </h3>
@@ -407,10 +488,10 @@ export default function Sidebar({
                     onClick={() =>
                       onSelectNote(note.id)
                     }
-                    className={`group flex items-center justify-between gap-2 py-1 px-3 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded cursor-pointer text-sm ${
+                    className={`group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
                       activeNoteId === note.id
-                        ? "bg-neutral-200/70 dark:bg-neutral-800/80 font-medium text-neutral-900 dark:text-neutral-100"
-                        : "text-neutral-600 dark:text-neutral-400"
+                        ? colors.activeItem
+                        : colors.idleItem
                     }`}
                   >
                     <div className="flex items-center gap-1.5 truncate min-w-0">
@@ -450,7 +531,7 @@ export default function Sidebar({
 
       {contextMenu && (
         <div
-          className="fixed z-50 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-lg rounded py-1 w-40 text-xs"
+          className={`fixed z-50 border shadow-lg rounded py-1 w-40 text-xs ${colors.menu}`}
           style={{
             top: contextMenu.y,
             left: contextMenu.x
@@ -467,7 +548,7 @@ export default function Sidebar({
               );
               closeContextMenu();
             }}
-            className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1.5"
+            className={`w-full text-left px-3 py-1.5 ${colors.itemHover} flex items-center gap-1.5 ${colors.menuText}`}
           >
             <Edit2 size={11} />
             Rename Folder
@@ -481,7 +562,7 @@ export default function Sidebar({
               );
               closeContextMenu();
             }}
-            className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 flex items-center gap-1.5"
+            className={`w-full text-left px-3 py-1.5 ${colors.itemHover} ${colors.menuText} flex items-center gap-1.5`}
           >
             <Trash2 size={11} />
             Delete Recursively
@@ -495,7 +576,7 @@ export default function Sidebar({
               );
               closeContextMenu();
             }}
-            className="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1.5"
+            className={`w-full text-left px-3 py-1.5 ${colors.itemHover} flex items-center gap-1.5 ${colors.menuText}`}
           >
             <Folder size={11} />
             Create Subfolder
