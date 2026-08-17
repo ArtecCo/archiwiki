@@ -1,58 +1,36 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback
-} from "react";
-
+import React, { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
-
+import html2pdf from "html2pdf.js";
 import {
+  Eye,
+  Edit,
+  Save,
+  BookOpen,
+  Download,
+  AlertTriangle,
+  FileText,
   Bold,
   Italic,
-  Strikethrough,
-  Heading1,
-  Heading2,
-  Heading3,
+  Heading,
   List,
   ListOrdered,
   Quote,
   Code,
-  Minus,
-  Link,
-  Undo2,
-  Redo2,
-  Eye,
-  Edit3,
-  Save,
-  Download,
-  AlertTriangle,
-  FileText,
-  BookOpen,
-  Clock,
-  Check,
-  MoreHorizontal
+  Link as LinkIcon
 } from "lucide-react";
-
-import {
-  acquireLock,
-  releaseLock
-} from "../firebase";
-
+import { acquireLock, releaseLock } from "../firebase";
 
 export default function Editor({
   note,
   onSaveNote,
-  notesPool,
+  notesPool = [],
   userId,
   fontSize,
   setFontSize,
-  onNavigateToNote
+  onNavigateToNote,
+  theme = "beige"
 }) {
-
   const [isEditing, setIsEditing] = useState(false);
-  const [isPreview, setIsPreview] = useState(false);
-
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
 
@@ -63,18 +41,80 @@ export default function Editor({
 
   const [wikiSuggest, setWikiSuggest] = useState(null);
 
-  const [saveStatus, setSaveStatus] = useState("saved");
-
   const textareaRef = useRef(null);
-
   const sessionToken = useRef(
     Math.random().toString(36).substring(2)
   ).current;
 
+  /*
+   * ---------------------------------------------------------
+   * THEME
+   * ---------------------------------------------------------
+   *
+   * These deliberately use the same existing color language
+   * from the original editor.
+   */
 
-  /* --------------------------------------------------
-     NOTE INITIALIZATION
-  -------------------------------------------------- */
+  const themeClasses = {
+    beige: {
+      page: "bg-[#F5F2EB] text-[#202122]",
+      toolbar: "bg-neutral-100/50",
+      input: "text-neutral-800",
+      sidebar: "bg-neutral-100/30",
+      card: "bg-white",
+      dropdown: "bg-white",
+      hover: "hover:bg-neutral-100",
+      active: "bg-neutral-100",
+      muted: "text-neutral-500",
+      border: "border-neutral-300",
+      buttonHover: "hover:bg-neutral-200",
+      status: "bg-neutral-100/80",
+      notification: "bg-neutral-200",
+      notificationText: "text-neutral-800"
+    },
+
+    wikipedia: {
+      page: "bg-[#F8F9FA] text-[#202122]",
+      toolbar: "bg-neutral-100/50",
+      input: "text-[#202122]",
+      sidebar: "bg-neutral-100/30",
+      card: "bg-white",
+      dropdown: "bg-white",
+      hover: "hover:bg-neutral-100",
+      active: "bg-neutral-100",
+      muted: "text-neutral-500",
+      border: "border-neutral-300",
+      buttonHover: "hover:bg-neutral-200",
+      status: "bg-neutral-100/80",
+      notification: "bg-neutral-200",
+      notificationText: "text-neutral-800"
+    },
+
+    charcoal: {
+      page: "bg-neutral-900 text-neutral-100",
+      toolbar: "bg-neutral-900",
+      input: "text-neutral-100",
+      sidebar: "bg-neutral-900",
+      card: "bg-neutral-800",
+      dropdown: "bg-neutral-800",
+      hover: "hover:bg-neutral-800",
+      active: "bg-neutral-800",
+      muted: "text-neutral-400",
+      border: "border-neutral-700",
+      buttonHover: "hover:bg-neutral-800",
+      status: "bg-neutral-900",
+      notification: "bg-neutral-800",
+      notificationText: "text-neutral-100"
+    }
+  };
+
+  const colors = themeClasses[theme] || themeClasses.beige;
+
+  /*
+   * ---------------------------------------------------------
+   * NOTE INITIALIZATION
+   * ---------------------------------------------------------
+   */
 
   useEffect(() => {
     if (!note) return;
@@ -82,8 +122,7 @@ export default function Editor({
     setTitle(note.title || "");
     setBody(note.body || "");
     setIsEditing(false);
-    setIsPreview(false);
-    setSaveStatus("saved");
+    setWikiSuggest(null);
 
     checkAndAcquireLock();
 
@@ -92,10 +131,11 @@ export default function Editor({
     };
   }, [note?.id]);
 
-
-  /* --------------------------------------------------
-     LOCK HEARTBEAT
-  -------------------------------------------------- */
+  /*
+   * ---------------------------------------------------------
+   * LOCK HEARTBEAT
+   * ---------------------------------------------------------
+   */
 
   useEffect(() => {
     if (!note || !isEditing) return;
@@ -109,81 +149,197 @@ export default function Editor({
     }, 60000);
 
     return () => clearInterval(interval);
-
-  }, [
-    note?.id,
-    isEditing,
-    userId
-  ]);
-
+  }, [note?.id, isEditing, userId]);
 
   const checkAndAcquireLock = async () => {
-
     if (!note) return;
 
-    const res = await acquireLock(
-      note.id,
-      userId,
-      sessionToken
-    );
+    try {
+      const res = await acquireLock(
+        note.id,
+        userId,
+        sessionToken
+      );
 
-    setLockStatus(res);
+      setLockStatus(res);
 
-    if (!res.success) {
+      if (!res.success) {
+        setIsEditing(false);
+      }
+    } catch (err) {
+      console.error("Lock error:", err);
+
+      setLockStatus({
+        success: false,
+        lockedBy: "another session"
+      });
+
       setIsEditing(false);
     }
   };
 
+  /*
+   * ---------------------------------------------------------
+   * TEXT EDITING
+   * ---------------------------------------------------------
+   */
 
-  /* --------------------------------------------------
-     SAVE
-  -------------------------------------------------- */
+  const handleTextareaChange = (e) => {
+    const value = e.target.value;
 
-  const saveCurrentNote = useCallback(async () => {
+    setBody(value);
+    checkForWikiTrigger(e);
+  };
 
-    if (!note) return;
+  /*
+   * ---------------------------------------------------------
+   * WIKI LINK AUTOCOMPLETE
+   * ---------------------------------------------------------
+   */
 
-    try {
+  const checkForWikiTrigger = (e) => {
+    const selectionEnd = e.target.selectionEnd;
 
-      setSaveStatus("saving");
+    const textBeforeCursor =
+      e.target.value.substring(0, selectionEnd);
 
-      await onSaveNote(
-        note.id,
-        title,
-        body
+    const lastOpenIndex =
+      textBeforeCursor.lastIndexOf("[[");
+
+    const lastCloseIndex =
+      textBeforeCursor.lastIndexOf("]]");
+
+    if (
+      lastOpenIndex !== -1 &&
+      lastOpenIndex >= lastCloseIndex
+    ) {
+      const query =
+        textBeforeCursor.substring(lastOpenIndex + 2);
+
+      const candidates = notesPool.filter(
+        (n) =>
+          n.id !== note?.id &&
+          n.title
+            ?.toLowerCase()
+            .startsWith(query.toLowerCase())
       );
 
-      setSaveStatus("saved");
+      if (candidates.length > 0) {
+        const coords = getCaretCoordinates(
+          e.target,
+          lastOpenIndex
+        );
 
-    } catch (error) {
+        setWikiSuggest({
+          query,
+          list: candidates,
+          index: 0,
+          pos: {
+            top: coords.top + 24,
+            left: coords.left
+          }
+        });
 
-      console.error(
-        "Failed to save note:",
-        error
-      );
-
-      setSaveStatus("error");
-
+        return;
+      }
     }
 
-  }, [
-    note,
-    title,
-    body,
-    onSaveNote
-  ]);
+    setWikiSuggest(null);
+  };
 
+  const handleKeyDown = (e) => {
+    if (!wikiSuggest) return;
 
-  /* --------------------------------------------------
-     TEXTAREA HELPERS
-  -------------------------------------------------- */
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
 
-  const replaceSelection = (
-    before,
-    after = before,
-    fallback = "text"
-  ) => {
+      setWikiSuggest((prev) => ({
+        ...prev,
+        index:
+          (prev.index + 1) %
+          prev.list.length
+      }));
+    }
 
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+
+      setWikiSuggest((prev) => ({
+        ...prev,
+        index:
+          (prev.index - 1 + prev.list.length) %
+          prev.list.length
+      }));
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      insertWikiLink(
+        wikiSuggest.list[wikiSuggest.index].title
+      );
+    }
+
+    if (e.key === "Escape") {
+      setWikiSuggest(null);
+    }
+  };
+
+  const insertWikiLink = (linkedTitle) => {
+    if (!textareaRef.current) return;
+
+    const cursor =
+      textareaRef.current.selectionEnd;
+
+    const beforeText =
+      body.substring(0, cursor);
+
+    const lastOpenIndex =
+      beforeText.lastIndexOf("[[");
+
+    const afterText =
+      body.substring(cursor);
+
+    const updatedBody =
+      beforeText.substring(0, lastOpenIndex) +
+      `[[${linkedTitle}]]` +
+      afterText;
+
+    setBody(updatedBody);
+    setWikiSuggest(null);
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+
+      const newPosition =
+        lastOpenIndex +
+        linkedTitle.length +
+        4;
+
+      textareaRef.current?.setSelectionRange(
+        newPosition,
+        newPosition
+      );
+    });
+  };
+
+  const getCaretCoordinates = (element) => {
+    return {
+      top: element.offsetTop,
+      left: element.offsetLeft + 20
+    };
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * EDITOR TOOLBAR
+   * ---------------------------------------------------------
+   *
+   * This does not introduce a new visual style.
+   * It simply inserts Markdown into the existing textarea.
+   */
+
+  const replaceSelection = (before, after = before) => {
     const textarea = textareaRef.current;
 
     if (!textarea) return;
@@ -191,41 +347,35 @@ export default function Editor({
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
-    const selected =
-      body.substring(start, end) ||
-      fallback;
+    const selected = body.substring(start, end);
+
+    const replacement =
+      before + selected + after;
 
     const updated =
       body.substring(0, start) +
-      before +
-      selected +
-      after +
+      replacement +
       body.substring(end);
 
     setBody(updated);
-    setSaveStatus("unsaved");
 
     requestAnimationFrame(() => {
-
       textarea.focus();
 
-      const cursor =
-        start +
-        before.length +
-        selected.length +
-        after.length;
+      const selectionStart =
+        start + before.length;
+
+      const selectionEnd =
+        selectionStart + selected.length;
 
       textarea.setSelectionRange(
-        start + before.length,
-        cursor - after.length
+        selectionStart,
+        selectionEnd
       );
-
     });
   };
 
-
   const insertAtCursor = (text) => {
-
     const textarea = textareaRef.current;
 
     if (!textarea) return;
@@ -239,42 +389,21 @@ export default function Editor({
       body.substring(end);
 
     setBody(updated);
-    setSaveStatus("unsaved");
 
     requestAnimationFrame(() => {
-
       textarea.focus();
 
-      const cursor =
+      const position =
         start + text.length;
 
       textarea.setSelectionRange(
-        cursor,
-        cursor
+        position,
+        position
       );
-
     });
   };
 
-
-  /* --------------------------------------------------
-     FORMATTING
-  -------------------------------------------------- */
-
-  const formatBold = () =>
-    replaceSelection("**", "**", "bold text");
-
-  const formatItalic = () =>
-    replaceSelection("*", "*", "italic text");
-
-  const formatStrike = () =>
-    replaceSelection("~~", "~~", "strikethrough");
-
-  const formatCode = () =>
-    replaceSelection("`", "`", "code");
-
-  const formatQuote = () => {
-
+  const applyHeading = () => {
     const textarea = textareaRef.current;
 
     if (!textarea) return;
@@ -283,14 +412,55 @@ export default function Editor({
     const end = textarea.selectionEnd;
 
     const selected =
-      body.substring(start, end) ||
-      "Quote";
+      body.substring(start, end);
 
-    const formatted =
-      selected
-        .split("\n")
-        .map(line => `> ${line}`)
-        .join("\n");
+    const replacement = selected
+      ? selected
+          .split("\n")
+          .map((line) =>
+            line.startsWith("# ")
+              ? line
+              : `## ${line}`
+          )
+          .join("\n")
+      : "## Heading";
+
+    const updated =
+      body.substring(0, start) +
+      replacement +
+      body.substring(end);
+
+    setBody(updated);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+    });
+  };
+
+  const applyList = (ordered = false) => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    const selected =
+      body.substring(start, end);
+
+    const lines = selected
+      ? selected.split("\n")
+      : ["List item"];
+
+    const formatted = lines
+      .map((line, index) => {
+        if (ordered) {
+          return `${index + 1}. ${line}`;
+        }
+
+        return `- ${line}`;
+      })
+      .join("\n");
 
     const updated =
       body.substring(0, start) +
@@ -298,353 +468,81 @@ export default function Editor({
       body.substring(end);
 
     setBody(updated);
-    setSaveStatus("unsaved");
-  };
-
-
-  const formatList = (ordered = false) => {
-
-    const textarea = textareaRef.current;
-
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    const selected =
-      body.substring(start, end) ||
-      "List item";
-
-    const formatted =
-      selected
-        .split("\n")
-        .map((line, index) =>
-          ordered
-            ? `${index + 1}. ${line}`
-            : `- ${line}`
-        )
-        .join("\n");
-
-    setBody(
-      body.substring(0, start) +
-      formatted +
-      body.substring(end)
-    );
-
-    setSaveStatus("unsaved");
-  };
-
-
-  const formatHeading = (level) => {
-
-    const textarea = textareaRef.current;
-
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-
-    const selected =
-      body.substring(start, end) ||
-      "Heading";
-
-    const prefix =
-      "#".repeat(level) + " ";
-
-    const formatted =
-      selected
-        .split("\n")
-        .map(line =>
-          `${prefix}${line.replace(/^#{1,6}\s+/, "")}`
-        )
-        .join("\n");
-
-    setBody(
-      body.substring(0, start) +
-      formatted +
-      body.substring(end)
-    );
-
-    setSaveStatus("unsaved");
-  };
-
-
-  const insertLink = () => {
-
-    const url = window.prompt(
-      "Enter URL:",
-      "https://"
-    );
-
-    if (!url) return;
-
-    const textarea = textareaRef.current;
-
-    const selected =
-      textarea &&
-      body.substring(
-        textarea.selectionStart,
-        textarea.selectionEnd
-      );
-
-    const label =
-      selected || "link";
-
-    insertAtCursor(
-      `[${label}](${url})`
-    );
-  };
-
-
-  const insertDivider = () => {
-    insertAtCursor("\n\n---\n\n");
-  };
-
-
-  /* --------------------------------------------------
-     UNDO / REDO
-  -------------------------------------------------- */
-
-  const undo = () => {
-
-    document.execCommand(
-      "undo"
-    );
-
-    textareaRef.current?.focus();
-  };
-
-
-  const redo = () => {
-
-    document.execCommand(
-      "redo"
-    );
-
-    textareaRef.current?.focus();
-  };
-
-
-  /* --------------------------------------------------
-     WIKI LINK AUTOCOMPLETE
-  -------------------------------------------------- */
-
-  const checkForWikiTrigger = (e) => {
-
-    const selectionEnd =
-      e.target.selectionEnd;
-
-    const textBeforeCursor =
-      e.target.value.substring(
-        0,
-        selectionEnd
-      );
-
-    const lastOpenIndex =
-      textBeforeCursor.lastIndexOf("[[");
-
-    if (
-      lastOpenIndex !== -1 &&
-      lastOpenIndex >=
-        textBeforeCursor.lastIndexOf("]]")
-    ) {
-
-      const query =
-        textBeforeCursor.substring(
-          lastOpenIndex + 2
-        );
-
-      const candidates =
-        notesPool.filter(n =>
-          n.id !== note?.id &&
-          n.title
-            ?.toLowerCase()
-            .startsWith(
-              query.toLowerCase()
-            )
-        );
-
-      if (candidates.length > 0) {
-
-        setWikiSuggest({
-          query,
-          list: candidates,
-          index: 0
-        });
-
-        return;
-      }
-    }
-
-    setWikiSuggest(null);
-  };
-
-
-  const insertWikiLink = (linkedTitle) => {
-
-    const textarea =
-      textareaRef.current;
-
-    if (!textarea) return;
-
-    const cursor =
-      textarea.selectionEnd;
-
-    const beforeText =
-      body.substring(0, cursor);
-
-    const lastOpenIndex =
-      beforeText.lastIndexOf("[[");
-
-    const afterText =
-      body.substring(cursor);
-
-    const updatedBody =
-      beforeText.substring(
-        0,
-        lastOpenIndex
-      ) +
-      `[[${linkedTitle}]]` +
-      afterText;
-
-    setBody(updatedBody);
-    setSaveStatus("unsaved");
-    setWikiSuggest(null);
 
     requestAnimationFrame(() => {
       textarea.focus();
     });
   };
 
+  const applyCode = () => {
+    const textarea = textareaRef.current;
 
-  const handleKeyDown = (e) => {
+    if (!textarea) return;
 
-    if (wikiSuggest) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
 
-      if (e.key === "ArrowDown") {
+    const selected =
+      body.substring(start, end);
 
-        e.preventDefault();
-
-        setWikiSuggest(prev => ({
-          ...prev,
-          index:
-            (prev.index + 1) %
-            prev.list.length
-        }));
-
-        return;
-      }
-
-      if (e.key === "ArrowUp") {
-
-        e.preventDefault();
-
-        setWikiSuggest(prev => ({
-          ...prev,
-          index:
-            (prev.index - 1 +
-              prev.list.length) %
-            prev.list.length
-        }));
-
-        return;
-      }
-
-      if (e.key === "Enter") {
-
-        e.preventDefault();
-
-        insertWikiLink(
-          wikiSuggest
-            .list[
-              wikiSuggest.index
-            ].title
-        );
-
-        return;
-      }
-
-      if (e.key === "Escape") {
-
-        e.preventDefault();
-
-        setWikiSuggest(null);
-
-        return;
-      }
-    }
-
-
-    /* Keyboard shortcuts */
-
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      e.key === "b"
-    ) {
-
-      e.preventDefault();
-      formatBold();
-
-      return;
-    }
-
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      e.key === "i"
-    ) {
-
-      e.preventDefault();
-      formatItalic();
-
-      return;
-    }
-
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      e.key === "s"
-    ) {
-
-      e.preventDefault();
-      saveCurrentNote();
-
-      return;
+    if (selected.includes("\n")) {
+      replaceSelection(
+        "```\n",
+        "\n```"
+      );
+    } else {
+      replaceSelection("`", "`");
     }
   };
 
+  const applyLink = () => {
+    const textarea = textareaRef.current;
 
-  /* --------------------------------------------------
-     MARKDOWN RENDERING
-  -------------------------------------------------- */
+    if (!textarea) return;
 
-  const parseWikiLinks = (
-    rawMarkdown
-  ) => {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
 
-    const renderedHtml =
-      marked.parse(
-        rawMarkdown || ""
+    const selected =
+      body.substring(start, end);
+
+    if (selected) {
+      replaceSelection("[", "](https://)");
+    } else {
+      insertAtCursor(
+        "[link text](https://)"
       );
+    }
+  };
+
+  /*
+   * ---------------------------------------------------------
+   * MARKDOWN / WIKI RENDERING
+   * ---------------------------------------------------------
+   */
+
+  const parseWikiLinks = (rawMarkdown) => {
+    const renderedHtml =
+      marked.parse(rawMarkdown || "");
 
     return renderedHtml.replace(
       /\[\[(.*?)\]\]/g,
       (match, linkedTitle) => {
-
         const matchNote =
           notesPool.find(
-            n =>
+            (n) =>
               n.title
                 ?.trim()
                 .toLowerCase() ===
               linkedTitle
-                .trim()
+                ?.trim()
                 .toLowerCase()
           );
 
         if (matchNote) {
-
           return `
             <span
-              class="wiki-link"
+              class="wiki-link underline cursor-pointer font-semibold"
               data-note-id="${matchNote.id}"
             >
               ${linkedTitle}
@@ -653,7 +551,7 @@ export default function Editor({
         }
 
         return `
-          <span class="wiki-link-missing">
+          <span class="text-neutral-400 line-through">
             ${linkedTitle}
           </span>
         `;
@@ -661,18 +559,14 @@ export default function Editor({
     );
   };
 
-
   const handleHtmlClick = (e) => {
-
-    const target =
-      e.target;
+    const target = e.target;
 
     if (
       target.classList.contains(
         "wiki-link"
       )
     ) {
-
       const targetId =
         target.getAttribute(
           "data-note-id"
@@ -684,329 +578,295 @@ export default function Editor({
     }
   };
 
+  /*
+   * ---------------------------------------------------------
+   * DIRECT PDF DOWNLOAD
+   * ---------------------------------------------------------
+   *
+   * No browser print dialog.
+   * No "Save as PDF" page.
+   *
+   * html2pdf.js creates and downloads the PDF directly.
+   */
 
-  /* --------------------------------------------------
-     METRICS
-  -------------------------------------------------- */
+  const triggerPdfDownload = async () => {
+    if (!note) return;
 
-  const words =
-    body.trim()
-      ? body.trim().split(/\s+/).length
-      : 0;
+    const pdfContainer =
+      document.createElement("div");
 
-  const characters =
-    body.length;
+    pdfContainer.style.position =
+      "fixed";
 
-  const readingTime =
-    Math.max(
-      1,
-      Math.ceil(words / 200)
+    pdfContainer.style.left =
+      "-100000px";
+
+    pdfContainer.style.top = "0";
+
+    pdfContainer.style.width =
+      "794px";
+
+    pdfContainer.style.background =
+      "white";
+
+    pdfContainer.style.color =
+      "#202122";
+
+    pdfContainer.style.padding =
+      "60px";
+
+    pdfContainer.style.boxSizing =
+      "border-box";
+
+    pdfContainer.innerHTML = `
+      <div
+        style="
+          font-family: Georgia, 'Times New Roman', serif;
+          color: #202122;
+          background: white;
+          width: 100%;
+          line-height: 1.7;
+          font-size: ${fontSize}px;
+        "
+      >
+        <h1
+          style="
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 32px;
+            line-height: 1.25;
+            margin: 0 0 30px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #d4d4d4;
+            color: #202122;
+          "
+        >
+          ${escapeHtml(title || "Untitled Note")}
+        </h1>
+
+        <div
+          style="
+            font-family: Georgia, 'Times New Roman', serif;
+            color: #202122;
+          "
+        >
+          ${parseWikiLinks(body)}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(
+      pdfContainer
     );
 
+    const options = {
+      margin: [15, 15, 15, 15],
 
-  /* --------------------------------------------------
-     PDF
-  -------------------------------------------------- */
+      filename:
+        `${sanitizeFilename(
+          title || "Untitled Note"
+        )}.pdf`,
+
+      image: {
+        type: "jpeg",
+        quality: 0.98
+      },
+
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff"
+      },
+
+      jsPDF: {
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait"
+      },
+
+      pagebreak: {
+        mode: [
+          "avoid-all",
+          "css",
+          "legacy"
+        ]
+      }
+    };
+
+    try {
+      await html2pdf()
+        .set(options)
+        .from(pdfContainer)
+        .save();
+    } catch (err) {
+      console.error(
+        "PDF export error:",
+        err
+      );
+
+      alert(
+        "Unable to export the manuscript as PDF."
+      );
+    } finally {
+      document.body.removeChild(
+        pdfContainer
+      );
+    }
+  };
 
   const escapeHtml = (value = "") => {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-};
-
-  const triggerPdfPrint = () => {
-  if (!note) return;
-
-  const renderedContent = parseWikiLinks(body);
-
-  const printWindow = window.open("", "_blank", "width=900,height=700");
-
-  if (!printWindow) {
-    alert("Please allow pop-ups to export the PDF.");
-    return;
-  }
-
-  printWindow.document.open();
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <title>${escapeHtml(title || "Untitled Note")}</title>
-
-        <style>
-          @page {
-            size: A4;
-            margin: 22mm 20mm 22mm 20mm;
-          }
-
-          * {
-            box-sizing: border-box;
-          }
-
-          html,
-          body {
-            margin: 0;
-            padding: 0;
-            background: white;
-            color: #202122;
-          }
-
-          body {
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: 12pt;
-            line-height: 1.75;
-          }
-
-          .document {
-            width: 100%;
-            max-width: 100%;
-          }
-
-          h1 {
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: 28pt;
-            line-height: 1.2;
-            margin: 0 0 24px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #d4d4d4;
-            color: #171717;
-          }
-
-          h2 {
-            font-size: 20pt;
-            margin-top: 28px;
-            margin-bottom: 12px;
-          }
-
-          h3 {
-            font-size: 16pt;
-            margin-top: 24px;
-            margin-bottom: 10px;
-          }
-
-          p {
-            margin: 0 0 14px;
-          }
-
-          ul,
-          ol {
-            margin: 12px 0 16px 28px;
-          }
-
-          li {
-            margin-bottom: 5px;
-          }
-
-          blockquote {
-            margin: 18px 0;
-            padding: 8px 18px;
-            border-left: 4px solid #a3a3a3;
-            color: #525252;
-          }
-
-          code {
-            font-family: "SFMono-Regular", Consolas, monospace;
-            font-size: 0.9em;
-            background: #f5f5f5;
-            padding: 2px 5px;
-            border-radius: 3px;
-          }
-
-          pre {
-            background: #f5f5f5;
-            padding: 14px;
-            border-radius: 6px;
-            overflow-wrap: break-word;
-            white-space: pre-wrap;
-          }
-
-          pre code {
-            background: transparent;
-            padding: 0;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 18px 0;
-          }
-
-          th,
-          td {
-            border: 1px solid #d4d4d4;
-            padding: 7px 10px;
-            text-align: left;
-          }
-
-          th {
-            background: #f5f5f5;
-          }
-
-          a {
-            color: #202122;
-            text-decoration: underline;
-          }
-
-          img {
-            max-width: 100%;
-            height: auto;
-          }
-
-          .wiki-link {
-            color: #202122;
-            font-weight: 600;
-            text-decoration: underline;
-          }
-
-          .document-footer {
-            margin-top: 40px;
-            padding-top: 10px;
-            border-top: 1px solid #e5e5e5;
-            color: #737373;
-            font-family: Arial, sans-serif;
-            font-size: 8pt;
-          }
-
-          @media print {
-            body {
-              print-color-adjust: exact;
-              -webkit-print-color-adjust: exact;
-            }
-
-            .document {
-              break-inside: auto;
-            }
-
-            h1,
-            h2,
-            h3 {
-              break-after: avoid;
-            }
-
-            pre,
-            blockquote,
-            table {
-              break-inside: avoid;
-            }
-          }
-        </style>
-      </head>
-
-      <body>
-        <main class="document">
-          <h1>${escapeHtml(title || "Untitled Note")}</h1>
-
-          <div class="content">
-            ${renderedContent}
-          </div>
-
-          <div class="document-footer">
-            Exported from Scribe
-          </div>
-        </main>
-      </body>
-    </html>
-  `);
-
-  printWindow.document.close();
-
-  // Wait until the new document has actually rendered.
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.focus();
-      printWindow.print();
-
-      // Give the browser time to finish the print operation.
-      setTimeout(() => {
-        printWindow.close();
-      }, 1000);
-    }, 300);
+    return String(value)
+      .replace(
+        /&/g,
+        "&amp;"
+      )
+      .replace(
+        /</g,
+        "&lt;"
+      )
+      .replace(
+        />/g,
+        "&gt;"
+      )
+      .replace(
+        /"/g,
+        "&quot;"
+      )
+      .replace(
+        /'/g,
+        "&#039;"
+      );
   };
-};
 
+  const sanitizeFilename = (
+    value
+  ) => {
+    return String(value)
+      .replace(
+        /[<>:"/\\|?*]/g,
+        "_"
+      )
+      .trim()
+      .substring(0, 150) ||
+      "Untitled Note";
+  };
 
-  /* --------------------------------------------------
-     NO NOTE SELECTED
-  -------------------------------------------------- */
+  /*
+   * ---------------------------------------------------------
+   * METRICS
+   * ---------------------------------------------------------
+   */
+
+  const calculateMetrics = () => {
+    const words =
+      body.trim()
+        ? body
+            .trim()
+            .split(/\s+/)
+            .length
+        : 0;
+
+    const lines =
+      body.split("\n").length;
+
+    const headers =
+      (
+        body.match(
+          /^#{1,6}\s+/gm
+        ) || []
+      ).length;
+
+    const readingTime =
+      Math.ceil(words / 200);
+
+    return {
+      words,
+      lines,
+      headers,
+      readingTime
+    };
+  };
+
+  const {
+    words,
+    lines,
+    headers,
+    readingTime
+  } = calculateMetrics();
+
+  /*
+   * ---------------------------------------------------------
+   * BACKLINKS
+   * ---------------------------------------------------------
+   */
+
+  const backlinks =
+    notesPool.filter(
+      (n) =>
+        n.id !== note?.id &&
+        n.body?.includes(
+          `[[${note?.title}]]`
+        )
+    );
+
+  /*
+   * ---------------------------------------------------------
+   * NO NOTE SELECTED
+   * ---------------------------------------------------------
+   */
 
   if (!note) {
-
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-cream-100 dark:bg-neutral-950 text-neutral-700 dark:text-neutral-300 p-12">
+      <div
+        className={`flex-1 flex flex-col items-center justify-center ${colors.page} font-serif p-12`}
+      >
+        <BookOpen
+          size={48}
+          className="stroke-1 text-neutral-400 mb-4"
+        />
 
-        <div className="w-20 h-20 rounded-3xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm flex items-center justify-center mb-6">
-
-          <BookOpen
-            size={34}
-            strokeWidth={1.5}
-            className="text-violet-400"
-          />
-
-        </div>
-
-        <h2 className="text-xl font-semibold mb-2">
-          Your writing space
-        </h2>
-
-        <p className="text-sm text-neutral-400 text-center max-w-sm">
-          Select a manuscript from the sidebar,
-          or create a new note to start writing.
+        <p className="text-xl italic">
+          Select a manuscript or
+          folder to begin editing.
         </p>
-
       </div>
     );
   }
 
+  /*
+   * ---------------------------------------------------------
+   * EDITOR
+   * ---------------------------------------------------------
+   */
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-cream-100 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-200">
+    <div
+      className={`flex-1 flex flex-col h-full ${colors.page}`}
+    >
+      {/* -------------------------------------------------- */}
+      {/* EDITOR CONTEXT MENU                                */}
+      {/* -------------------------------------------------- */}
 
-      {/* ================================================
-          TOP BAR
-      ================================================= */}
+      <div
+        className={`flex items-center justify-between border-b ${colors.border} px-6 py-3 ${colors.toolbar}`}
+      >
+        <div className="flex items-center gap-2 text-sm text-neutral-600">
+          <span className="font-serif italic font-medium">
+            Scribe
+          </span>
 
-      <div className="h-14 shrink-0 border-b border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/90 backdrop-blur flex items-center justify-between px-5">
+          <span>&gt;</span>
 
-        <div className="flex items-center gap-3 min-w-0">
-
-          <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-950/50 flex items-center justify-center">
-
-            <FileText
-              size={15}
-              className="text-violet-500"
-            />
-
-          </div>
-
-          <div className="min-w-0">
-
-            <div className="text-[10px] uppercase tracking-[0.16em] text-neutral-400">
-              Manuscript
-            </div>
-
-            <div className="text-sm font-semibold truncate max-w-[300px]">
-              {title || "Untitled"}
-            </div>
-
-          </div>
-
+          <span className="font-semibold">
+            {note.title ||
+              "Untitled"}
+          </span>
         </div>
 
+        <div className="flex items-center gap-4">
+          {/* Font size */}
 
-        <div className="flex items-center gap-2">
-
-          {/* Font Size */}
-
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800">
-
-            <span className="text-[10px] text-neutral-400">
-              Aa
-            </span>
+          <div className="flex items-center gap-2 text-xs">
+            <span>Size:</span>
 
             <input
               type="range"
@@ -1015,661 +875,446 @@ export default function Editor({
               value={fontSize}
               onChange={(e) =>
                 setFontSize(
-                  Number(e.target.value)
+                  parseInt(
+                    e.target.value,
+                    10
+                  )
                 )
               }
-              className="w-20 accent-violet-500"
+              className="w-20 accent-neutral-900 bg-neutral-200 h-1 rounded-lg cursor-pointer"
             />
 
-            <span className="text-[10px] w-7 text-right">
-              {fontSize}
+            <span className="w-8">
+              {fontSize}px
             </span>
-
           </div>
 
-
-          {/* Preview */}
-
-          <button
-            type="button"
-            onClick={() =>
-              setIsPreview(!isPreview)
-            }
-            className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 transition"
-            title={
-              isPreview
-                ? "Edit"
-                : "Preview"
-            }
-          >
-
-            {isPreview ? (
-              <Edit3 size={15} />
-            ) : (
-              <Eye size={15} />
-            )}
-
-          </button>
-
-
-          {/* PDF */}
-
-          <button
-            type="button"
-            onClick={triggerPdfPrint}
-            className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 transition"
-            title="Print / Save PDF"
-          >
-
-            <Download size={15} />
-
-          </button>
-
-
-          {/* Save / Edit */}
-
-          {lockStatus.success ? (
+          <div className="flex items-center gap-1.5">
+            {/* PDF */}
 
             <button
-              type="button"
-              onClick={async () => {
-
-                if (isEditing) {
-                  await saveCurrentNote();
-                  setIsEditing(false);
-                } else {
-                  setIsEditing(true);
-                }
-
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white text-xs font-semibold shadow-sm transition"
+              onClick={
+                triggerPdfDownload
+              }
+              title="Download PDF"
+              className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600 flex items-center gap-1 text-xs`}
             >
-
-              {isEditing ? (
-                <>
-                  <Save size={14} />
-                  Save
-                </>
-              ) : (
-                <>
-                  <Edit3 size={14} />
-                  Edit
-                </>
-              )}
-
+              <Download size={14} />
+              PDF
             </button>
 
-          ) : (
+            {/* Edit / Save */}
 
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-medium">
+            {lockStatus.success ? (
+              <button
+                onClick={async () => {
+                  if (isEditing) {
+                    await onSaveNote(
+                      note.id,
+                      title,
+                      body
+                    );
+                  }
 
-              <AlertTriangle size={13} />
-
-              Read-only
-
-            </div>
-          )}
-
+                  setIsEditing(
+                    !isEditing
+                  );
+                }}
+                className="py-1 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                {isEditing ? (
+                  <>
+                    <Save size={12} />
+                    Save
+                  </>
+                ) : (
+                  <>
+                    <Edit size={12} />
+                    Edit
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-200 text-neutral-700 rounded text-xs font-semibold">
+                <AlertTriangle
+                  size={12}
+                />
+                Read-Only
+              </div>
+            )}
+          </div>
         </div>
-
       </div>
 
-
-      {/* ================================================
-          LOCK WARNING
-      ================================================= */}
+      {/* -------------------------------------------------- */}
+      {/* LOCK NOTIFICATION                                  */}
+      {/* -------------------------------------------------- */}
 
       {!lockStatus.success && (
+        <div
+          className={`${colors.notification} ${colors.notificationText} text-xs px-6 py-2 border-b ${colors.border} flex items-center gap-2`}
+        >
+          <AlertTriangle
+            size={14}
+          />
 
-        <div className="px-5 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
-
-          <AlertTriangle size={14} />
-
-          This manuscript is being edited on another device.
-          You are currently in read-only mode.
-
+          <span>
+            This manuscript is
+            currently being written
+            on another active device
+            by user [
+            {lockStatus.lockedBy}
+            ]. Access is temporarily
+            restricted to Read Only.
+          </span>
         </div>
       )}
 
-
-      {/* ================================================
-          EDITOR / READING AREA
-      ================================================= */}
+      {/* -------------------------------------------------- */}
+      {/* WORKING DESK                                       */}
+      {/* -------------------------------------------------- */}
 
       <div className="flex-1 flex overflow-hidden">
+        {/* ------------------------------------------------ */}
+        {/* MAIN WORKSPACE                                   */}
+        {/* ------------------------------------------------ */}
 
-
-        {/* MAIN WRITING AREA */}
-
-        <div className="flex-1 overflow-y-auto">
-
-          <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 py-8">
-
-
-            {isEditing && !isPreview && (
-
-              /* TOOLBAR */
-
-              <div className="sticky top-0 z-30 mb-5">
-
-                <div className="flex flex-wrap items-center gap-1 p-2 rounded-2xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur border border-neutral-200 dark:border-neutral-800 shadow-sm">
-
-                  <ToolbarButton
-                    icon={<Bold size={15} />}
-                    title="Bold"
-                    onClick={formatBold}
-                  />
-
-                  <ToolbarButton
-                    icon={<Italic size={15} />}
-                    title="Italic"
-                    onClick={formatItalic}
-                  />
-
-                  <ToolbarButton
-                    icon={<Strikethrough size={15} />}
-                    title="Strikethrough"
-                    onClick={formatStrike}
-                  />
-
-
-                  <ToolbarDivider />
-
-
-                  <ToolbarButton
-                    icon={<Heading1 size={15} />}
-                    title="Heading 1"
-                    onClick={() =>
-                      formatHeading(1)
-                    }
-                  />
-
-                  <ToolbarButton
-                    icon={<Heading2 size={15} />}
-                    title="Heading 2"
-                    onClick={() =>
-                      formatHeading(2)
-                    }
-                  />
-
-                  <ToolbarButton
-                    icon={<Heading3 size={15} />}
-                    title="Heading 3"
-                    onClick={() =>
-                      formatHeading(3)
-                    }
-                  />
-
-
-                  <ToolbarDivider />
-
-
-                  <ToolbarButton
-                    icon={<List size={15} />}
-                    title="Bullet list"
-                    onClick={() =>
-                      formatList(false)
-                    }
-                  />
-
-                  <ToolbarButton
-                    icon={<ListOrdered size={15} />}
-                    title="Numbered list"
-                    onClick={() =>
-                      formatList(true)
-                    }
-                  />
-
-                  <ToolbarButton
-                    icon={<Quote size={15} />}
-                    title="Quote"
-                    onClick={formatQuote}
-                  />
-
-                  <ToolbarButton
-                    icon={<Code size={15} />}
-                    title="Inline code"
-                    onClick={formatCode}
-                  />
-
-
-                  <ToolbarDivider />
-
-
-                  <ToolbarButton
-                    icon={<Link size={15} />}
-                    title="Insert link"
-                    onClick={insertLink}
-                  />
-
-                  <ToolbarButton
-                    icon={<Minus size={15} />}
-                    title="Horizontal divider"
-                    onClick={insertDivider}
-                  />
-
-
-                  <div className="flex-1" />
-
-
-                  <ToolbarButton
-                    icon={<Undo2 size={15} />}
-                    title="Undo"
-                    onClick={undo}
-                  />
-
-                  <ToolbarButton
-                    icon={<Redo2 size={15} />}
-                    title="Redo"
-                    onClick={redo}
-                  />
-
-                </div>
-
-              </div>
-            )}
-
-
-            {/* ========================================
-                PAPER
-            ========================================= */}
-
-            <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-sm min-h-[calc(100vh-180px)] overflow-hidden">
-
+        <div
+          className="flex-1 flex flex-col p-8 overflow-y-auto"
+          style={{
+            fontSize: `${fontSize}px`
+          }}
+        >
+          {isEditing ? (
+            <div className="flex-1 flex flex-col gap-4 relative">
 
               {/* TITLE */}
 
-              <div className="px-7 sm:px-12 pt-10">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) =>
+                  setTitle(
+                    e.target.value
+                  )
+                }
+                placeholder="Title your note"
+                className={`w-full bg-transparent border-b ${colors.border} pb-2 focus:outline-none focus:border-neutral-800 font-serif font-bold text-2xl tracking-wide placeholder-neutral-300`}
+              />
 
-                {isEditing && !isPreview ? (
-
-                  <input
-                    value={title}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      setSaveStatus("unsaved");
-                    }}
-                    placeholder="Untitled manuscript"
-                    className="w-full bg-transparent border-0 outline-none text-3xl sm:text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 placeholder-neutral-300 dark:placeholder-neutral-700"
-                  />
-
-                ) : (
-
-                  <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-                    {title || "Untitled manuscript"}
-                  </h1>
-
-                )}
-
-                <div className="mt-5 h-px bg-neutral-100 dark:bg-neutral-800" />
-
-              </div>
-
-
-              {/* CONTENT */}
+              {/* ------------------------------------------------ */}
+              {/* MARKDOWN TOOLBAR                                 */}
+              {/* ------------------------------------------------ */}
 
               <div
-                className="px-7 sm:px-12 py-8"
-                style={{
-                  fontSize: `${fontSize}px`
-                }}
+                className={`flex items-center gap-1 border-b ${colors.border} pb-2`}
               >
-
-                {isEditing && !isPreview ? (
-
-                  <div className="relative">
-
-                    <textarea
-                      ref={textareaRef}
-                      value={body}
-                      onChange={(e) => {
-
-                        setBody(e.target.value);
-                        setSaveStatus("unsaved");
-                        checkForWikiTrigger(e);
-
-                      }}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Start writing...
-
-Use the toolbar above to format your manuscript.
-
-Type [[ to link another manuscript."
-                      className="w-full min-h-[55vh] bg-transparent border-0 outline-none resize-none text-neutral-700 dark:text-neutral-300 leading-[1.9] placeholder:text-neutral-300 dark:placeholder:text-neutral-700 font-normal"
-                      spellCheck="true"
-                    />
-
-
-                    {/* Wiki autocomplete */}
-
-                    {wikiSuggest && (
-
-                      <div className="absolute left-0 top-8 z-50 w-72 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl shadow-xl overflow-hidden">
-
-                        <div className="px-3 py-2 text-[10px] uppercase tracking-wider font-semibold text-neutral-400 border-b border-neutral-100 dark:border-neutral-800">
-
-                          Link manuscript
-
-                        </div>
-
-                        {wikiSuggest.list.map(
-                          (item, index) => (
-
-                            <button
-                              type="button"
-                              key={item.id}
-                              onClick={() =>
-                                insertWikiLink(
-                                  item.title
-                                )
-                              }
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800 ${
-                                index ===
-                                wikiSuggest.index
-                                  ? "bg-violet-50 dark:bg-violet-950/30"
-                                  : ""
-                              }`}
-                            >
-
-                              <FileText
-                                size={13}
-                                className="text-violet-500"
-                              />
-
-                              <span className="truncate">
-                                {item.title}
-                              </span>
-
-                            </button>
-                          )
-                        )}
-
-                      </div>
-                    )}
-
-                  </div>
-
-                ) : (
-
-                  <article
-                    className="prose prose-neutral dark:prose-invert max-w-none leading-[1.9]"
-                    onClick={handleHtmlClick}
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        parseWikiLinks(body)
-                    }}
+                <button
+                  type="button"
+                  title="Bold"
+                  onClick={() =>
+                    replaceSelection(
+                      "**",
+                      "**"
+                    )
+                  }
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Bold
+                    size={14}
                   />
+                </button>
 
-                )}
+                <button
+                  type="button"
+                  title="Italic"
+                  onClick={() =>
+                    replaceSelection(
+                      "*",
+                      "*"
+                    )
+                  }
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Italic
+                    size={14}
+                  />
+                </button>
 
+                <button
+                  type="button"
+                  title="Heading"
+                  onClick={
+                    applyHeading
+                  }
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Heading
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Bulleted list"
+                  onClick={() =>
+                    applyList(false)
+                  }
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <List
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Numbered list"
+                  onClick={() =>
+                    applyList(true)
+                  }
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <ListOrdered
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Quote"
+                  onClick={() =>
+                    replaceSelection(
+                      "> ",
+                      ""
+                    )
+                  }
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Quote
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Code"
+                  onClick={applyCode}
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Code
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Link"
+                  onClick={applyLink}
+                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <LinkIcon
+                    size={14}
+                  />
+                </button>
               </div>
 
+              {/* BODY */}
+
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={
+                  handleTextareaChange
+                }
+                onKeyDown={
+                  handleKeyDown
+                }
+                placeholder="Write your thoughts... Type '[[' to link pages."
+                className={`flex-1 w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed ${colors.input}`}
+              />
+
+              {/* ------------------------------------------------ */}
+              {/* WIKI AUTOCOMPLETE                                */}
+              {/* ------------------------------------------------ */}
+
+              {wikiSuggest && (
+                <div
+                  className={`absolute z-50 ${colors.dropdown} border ${colors.border} rounded shadow-lg p-1 w-64 max-h-48 overflow-y-auto text-xs font-sans`}
+                  style={{
+                    top: `${wikiSuggest.pos.top}px`,
+                    left: `${wikiSuggest.pos.left}px`
+                  }}
+                >
+                  <p className="px-2 py-1 text-[10px] text-neutral-400 uppercase font-bold tracking-wider">
+                    Connect note
+                  </p>
+
+                  {wikiSuggest.list.map(
+                    (item, idx) => (
+                      <div
+                        key={item.id}
+                        onClick={() =>
+                          insertWikiLink(
+                            item.title
+                          )
+                        }
+                        className={`px-3 py-1.5 cursor-pointer rounded flex items-center gap-1.5 ${
+                          idx ===
+                          wikiSuggest.index
+                            ? `${colors.active} font-semibold`
+                            : colors.hover
+                        }`}
+                      >
+                        <FileText
+                          size={12}
+                        />
+
+                        <span className="truncate">
+                          {item.title}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </div>
+          ) : (
+            /* ------------------------------------------------ */
+            /* READING MODE                                    */
+            /* ------------------------------------------------ */
 
-          </div>
+            <div
+              id="print-container"
+              className="flex-1 prose max-w-2xl mx-auto font-serif leading-loose"
+              onClick={
+                handleHtmlClick
+              }
+            >
+              <h1 className="text-3xl font-bold border-b border-neutral-300 pb-4 mb-6 tracking-wide">
+                {title ||
+                  "Untitled Note"}
+              </h1>
 
+              <div
+                className={
+                  theme === "charcoal"
+                    ? "text-neutral-100"
+                    : "text-neutral-800"
+                }
+                dangerouslySetInnerHTML={{
+                  __html:
+                    parseWikiLinks(
+                      body
+                    )
+                }}
+              />
+            </div>
+          )}
         </div>
 
+        {/* -------------------------------------------------- */}
+        {/* BACKLINK PANEL                                    */}
+        {/* -------------------------------------------------- */}
 
-        {/* ================================================
-            RIGHT SIDEBAR
-        ================================================= */}
+        <div
+          className={`w-56 border-l ${colors.border} ${colors.sidebar} p-4 flex flex-col gap-4 text-xs font-sans`}
+        >
+          <h4 className="font-bold uppercase tracking-wider text-neutral-500 text-[10px]">
+            Backlinks ({backlinks.length})
+          </h4>
 
-        <aside className="hidden xl:flex w-64 shrink-0 border-l border-neutral-200 dark:border-neutral-800 bg-white/50 dark:bg-neutral-900/40 flex-col">
-
-          <div className="p-5">
-
-            <div className="flex items-center gap-2 mb-5">
-
-              <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-950/50 flex items-center justify-center">
-
-                <MoreHorizontal
-                  size={14}
-                  className="text-violet-500"
-                />
-
-              </div>
-
-              <span className="text-xs font-semibold">
-                Manuscript info
-              </span>
-
-            </div>
-
-
-            {/* Statistics */}
-
-            <div className="space-y-2">
-
-              <StatRow
-                label="Words"
-                value={words}
-              />
-
-              <StatRow
-                label="Characters"
-                value={characters}
-              />
-
-              <StatRow
-                label="Reading time"
-                value={`~${readingTime} min`}
-              />
-
-            </div>
-
-          </div>
-
-
-          {/* BACKLINKS */}
-
-          <div className="flex-1 border-t border-neutral-200 dark:border-neutral-800 p-5 overflow-y-auto">
-
-            <div className="flex items-center justify-between mb-4">
-
-              <span className="text-[10px] uppercase tracking-wider font-bold text-neutral-400">
-                Backlinks
-              </span>
-
-              <span className="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
-                {notesPool.filter(
-                  n =>
-                    n.id !== note.id &&
-                    n.body?.includes(
-                      `[[${note.title}]]`
-                    )
-                ).length}
-              </span>
-
-            </div>
-
-
-            <div className="space-y-2">
-
-              {notesPool
-                .filter(
-                  n =>
-                    n.id !== note.id &&
-                    n.body?.includes(
-                      `[[${note.title}]]`
-                    )
-                )
-                .map(backlink => (
-
-                  <button
-                    type="button"
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {backlinks.length > 0 ? (
+              backlinks.map(
+                (backlink) => (
+                  <div
                     key={backlink.id}
                     onClick={() =>
                       onNavigateToNote(
                         backlink.id
                       )
                     }
-                    className="w-full text-left p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:border-violet-300 dark:hover:border-violet-800 transition"
+                    className={`p-2 border ${colors.border} ${colors.card} rounded cursor-pointer transition-colors ${colors.buttonHover}`}
                   >
-
-                    <div className="flex items-center gap-2">
-
-                      <FileText
-                        size={13}
-                        className="text-violet-400"
-                      />
-
-                      <span className="text-xs font-semibold truncate">
-                        {backlink.title}
-                      </span>
-
-                    </div>
-
-                    <p className="text-[10px] text-neutral-400 mt-1 line-clamp-2">
-                      {backlink.body}
+                    <p
+                      className={`font-semibold truncate ${
+                        theme === "charcoal"
+                          ? "text-neutral-100"
+                          : "text-neutral-900"
+                      }`}
+                    >
+                      {backlink.title}
                     </p>
 
-                  </button>
-
-                ))}
-
-
-              {notesPool.filter(
-                n =>
-                  n.id !== note.id &&
-                  n.body?.includes(
-                    `[[${note.title}]]`
-                  )
-              ).length === 0 && (
-
-                <p className="text-[11px] text-neutral-400 leading-relaxed">
-                  No other manuscripts link to this page yet.
-                </p>
-
-              )}
-
-            </div>
-
+                    <p className="text-[10px] text-neutral-500 truncate">
+                      {backlink.body}
+                    </p>
+                  </div>
+                )
+              )
+            ) : (
+              <p className="text-neutral-400 italic">
+                No connections link
+                here yet.
+              </p>
+            )}
           </div>
-
-        </aside>
-
+        </div>
       </div>
 
+      {/* -------------------------------------------------- */}
+      {/* STATUS BAR                                         */}
+      {/* -------------------------------------------------- */}
 
-      {/* ================================================
-          STATUS BAR
-      ================================================= */}
-
-      <div className="h-9 shrink-0 border-t border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-neutral-900/90 flex items-center justify-between px-5 text-[10px] text-neutral-400">
-
-        <div className="flex items-center gap-4">
+      <div
+        className={`border-t ${colors.border} ${colors.status} px-6 py-1.5 flex justify-between items-center text-[11px] font-sans text-neutral-500`}
+      >
+        <div className="flex gap-4">
+          <span>
+            Words:{" "}
+            <strong>
+              {words}
+            </strong>
+          </span>
 
           <span>
-            {words} words
+            Lines:{" "}
+            <strong>
+              {lines}
+            </strong>
           </span>
 
           <span>
-            {characters} characters
+            Headers:{" "}
+            <strong>
+              {headers}
+            </strong>
           </span>
-
-          <span className="hidden sm:inline">
-            ~{readingTime} min read
-          </span>
-
         </div>
 
-
-        <div className="flex items-center gap-2">
-
-          {saveStatus === "saving" && (
-            <>
-              <Clock size={11} />
-              Saving...
-            </>
-          )}
-
-          {saveStatus === "saved" && (
-            <>
-              <Check
-                size={11}
-                className="text-emerald-500"
-              />
-              Saved
-            </>
-          )}
-
-          {saveStatus === "unsaved" && (
-            <span className="text-amber-500">
-              Unsaved changes
-            </span>
-          )}
-
-          {saveStatus === "error" && (
-            <span className="text-red-500">
-              Save failed
-            </span>
-          )}
-
-          <span className="ml-2 text-neutral-300 dark:text-neutral-700">
-            •
+        <div className="flex gap-4">
+          <span>
+            Read Time: ~
+            <strong>
+              {readingTime} min
+            </strong>
           </span>
 
           <span>
-            AES-256 encrypted
+            Status:{" "}
+            <strong
+              className={
+                theme === "charcoal"
+                  ? "text-neutral-100"
+                  : "text-neutral-700"
+              }
+            >
+              Encrypted AES-256
+            </strong>
           </span>
-
         </div>
-
       </div>
-
-    </div>
-  );
-}
-
-
-/* ======================================================
-   SMALL COMPONENTS
-====================================================== */
-
-function ToolbarButton({
-  icon,
-  title,
-  onClick
-}) {
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition"
-    >
-      {icon}
-    </button>
-  );
-}
-
-
-function ToolbarDivider() {
-
-  return (
-    <div className="h-5 w-px bg-neutral-200 dark:bg-neutral-700 mx-1" />
-  );
-}
-
-
-function StatRow({
-  label,
-  value
-}) {
-
-  return (
-    <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-800/60">
-
-      <span className="text-[11px] text-neutral-400">
-        {label}
-      </span>
-
-      <span className="text-xs font-semibold">
-        {value}
-      </span>
-
     </div>
   );
 }
