@@ -5,6 +5,7 @@ import {
   collection, 
   onSnapshot, 
   addDoc, 
+  setDoc,
   updateDoc, 
   doc, 
   deleteDoc, 
@@ -15,7 +16,7 @@ import { encryptData, decryptData } from "./crypto";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import GraphView from "./components/GraphView";
-import { FileText, LogOut, Share2, Book } from "lucide-react";
+import { LogOut, Share2, Menu } from "lucide-react";
 
 export default function App() {
   const { user, masterKey, login, registerWithInvite, logout } = useAuth();
@@ -32,9 +33,13 @@ export default function App() {
   const [encryptedNotes, setEncryptedNotes] = useState([]);
   const [decryptedNotes, setDecryptedNotes] = useState([]);
   const [activeNoteId, setActiveNoteId] = useState(null);
+  const [newNoteId, setNewNoteId] = useState(null);
+  const [pendingNotes, setPendingNotes] = useState([]);
   const [fontSize, setFontSize] = useState(16);
   const [theme, setTheme] = useState("beige"); // beige | wikipedia | charcoal
   const [activeTab, setActiveTab] = useState("editor"); // editor | graph
+  const [dialog, setDialog] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Load Database Items
   useEffect(() => {
@@ -47,10 +52,36 @@ export default function App() {
     });
 
     // Load Notes
-    const qNotes = query(collection(db, "notes"), where("userId", "==", user.uid));
-    const unsubNotes = onSnapshot(qNotes, (snap) => {
-      setEncryptedNotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    // Load Notes
+const qNotes = query(
+  collection(db, "notes"),
+  where("userId", "==", user.uid)
+);
+
+const unsubNotes = onSnapshot(
+  qNotes,
+  (snap) => {
+    const snapshotNotes = snap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    setEncryptedNotes(snapshotNotes);
+
+    // Remove locally-pending notes once Firestore confirms them.
+    setPendingNotes((prev) =>
+      prev.filter(
+        (pending) =>
+          !snapshotNotes.some(
+            (note) => note.id === pending.id
+          )
+      )
+    );
+  },
+  (error) => {
+    console.error("Failed to load notes from Firestore:", error);
+  }
+);
 
     return () => {
       unsubFolders();
@@ -59,22 +90,59 @@ export default function App() {
   }, [user]);
 
   // Decrypt Notes automatically when masterKey or encryptedNotes change
-  useEffect(() => {
-    if (!masterKey || encryptedNotes.length === 0) {
-      setDecryptedNotes([]);
-      return;
+  // Decrypt Notes automatically when masterKey,
+// encryptedNotes, or pendingNotes change
+useEffect(() => {
+  if (!masterKey) {
+    setDecryptedNotes([]);
+    return;
+  }
+
+  const allNotes = [
+    ...encryptedNotes,
+    ...pendingNotes.filter(
+      (pending) =>
+        !encryptedNotes.some(
+          (note) => note.id === pending.id
+        )
+    )
+  ];
+
+  const decrypted = allNotes.map((n) => ({
+    id: n.id,
+    folderId: n.folderId ?? null,
+    title: decryptData(n.title, masterKey) || "",
+    body: decryptData(n.body, masterKey) || "",
+    updatedAt: n.updatedAt
+  }));
+
+  setDecryptedNotes(decrypted);
+}, [encryptedNotes, pendingNotes, masterKey]);
+
+useEffect(() => {
+  const restoreNoteFromUrl = () => {
+    const params = new URLSearchParams(
+      window.location.hash.substring(1)
+    );
+
+    const noteId = params.get("note");
+
+    if (noteId) {
+      setActiveNoteId(noteId);
+      setActiveTab("editor");
     }
-    const decrypted = encryptedNotes.map(n => {
-      return {
-        id: n.id,
-        folderId: n.folderId,
-        title: decryptData(n.title, masterKey) || "Untitled Note",
-        body: decryptData(n.body, masterKey) || "",
-        updatedAt: n.updatedAt
-      };
-    });
-    setDecryptedNotes(decrypted);
-  }, [encryptedNotes, masterKey]);
+  };
+
+  restoreNoteFromUrl();
+
+  window.addEventListener("popstate", restoreNoteFromUrl);
+  window.addEventListener("hashchange", restoreNoteFromUrl);
+
+  return () => {
+    window.removeEventListener("popstate", restoreNoteFromUrl);
+    window.removeEventListener("hashchange", restoreNoteFromUrl);
+  };
+}, []);
 
   // Handling registration & login calls
   // Handling registration & login calls
@@ -83,7 +151,7 @@ const handleAuthSubmit = async (e) => {
   setError("");
 
   try {
-    if (isRegistering) {
+    if (isRegistering && !user) {
       await registerWithInvite(
         email,
         password,
@@ -91,7 +159,7 @@ const handleAuthSubmit = async (e) => {
       );
     } else {
       await login(
-        email,
+        requiresUnlock ? user.email : email,
         password
       );
     }
@@ -105,38 +173,64 @@ const handleAuthSubmit = async (e) => {
 };
 
   const handleCreateFolder = async (parentId = null) => {
-    const name = prompt("Name your folder:");
-    if (!name) return;
-    await addDoc(collection(db, "folders"), {
-      name,
-      parentId,
-      userId: user.uid,
-      createdAt: Date.now()
+    setDialog({
+      kind: "input",
+      title: "Create folder",
+      label: "Folder name",
+      value: "",
+      confirmLabel: "Create",
+      onConfirm: async (name) => {
+        if (!name.trim()) return;
+        await addDoc(collection(db, "folders"), {
+          name: name.trim(), parentId, userId: user.uid, createdAt: Date.now()
+        });
+      }
     });
   };
 
 const handleCreateNote = async (folderId = null) => {
-  if (!masterKey) {
-    setError(
-      "Encryption key is unavailable. Please log out and log in again."
-    );
-    return;
-  }
+  const noteRef = doc(collection(db, "notes"));
+  const now = Date.now();
+  const newNote = {
+    id: noteRef.id,
+    userId: user.uid,
+    folderId: folderId ?? null,
+    title: "",
+    body: "",
+    updatedAt: now
+  };
 
-  const defaultTitle = "Untitled Manuscript";
-  const defaultBody = "Start writing your encrypted notes...";
+  setPendingNotes((prev) => {
+    if (prev.some((note) => note.id === newNote.id)) {
+      return prev;
+    }
+
+    return [...prev, newNote];
+  });
+
+  setNewNoteId(noteRef.id);
+  setActiveNoteId(noteRef.id);
+  setActiveTab("editor");
+
+  window.history.pushState(
+    { noteId: noteRef.id },
+    "",
+    `#note=${noteRef.id}`
+  );
 
   try {
-    await addDoc(collection(db, "notes"), {
+    await setDoc(noteRef, {
       userId: user.uid,
-      folderId,
-      title: encryptData(defaultTitle, masterKey),
-      body: encryptData(defaultBody, masterKey),
-      updatedAt: Date.now()
+      folderId: folderId ?? null,
+      title: "",
+      body: "",
+      updatedAt: now
     });
-  } catch (err) {
-    console.error("Create note error:", err);
-    setError("Unable to create encrypted note.");
+  } catch (error) {
+    console.error("Failed to create note:", error);
+    setPendingNotes((prev) =>
+      prev.filter((note) => note.id !== noteRef.id)
+    );
   }
 };
 
@@ -150,8 +244,6 @@ const handleCreateNote = async (folderId = null) => {
   };
 
   const handleDeleteFolder = async (folderId) => {
-    if (!confirm("Are you sure? This recursively deletes subfolders and connected manuscripts.")) return;
-    // Simple mock recursive delete
     const deleteRecursive = async (fid) => {
       const childFolds = folders.filter(f => f.parentId === fid);
       for (const child of childFolds) {
@@ -164,7 +256,14 @@ const handleCreateNote = async (folderId = null) => {
       }
       await deleteDoc(doc(db, "folders", fid));
     };
-    await deleteRecursive(folderId);
+    setDialog({
+      kind: "confirm",
+      title: "Delete folder?",
+      message: "This permanently deletes the folder, its subfolders, and their notes.",
+      confirmLabel: "Delete permanently",
+      destructive: true,
+      onConfirm: () => deleteRecursive(folderId)
+    });
   };
 
   const handleMoveItem = async (itemId, itemType, targetFolderId) => {
@@ -178,7 +277,6 @@ const handleCreateNote = async (folderId = null) => {
 
   // Compile entire decrypted project as a ZIP download structure
   const exportAllToZip = () => {
-    alert("Export active! Compiling individual raw files in local directories...");
     const files = decryptedNotes.map(n => {
       const path = getFolderPath(n.folderId);
       return {
@@ -213,12 +311,89 @@ const handleCreateNote = async (folderId = null) => {
     }
   };
 
-  if (!user) {
+  const getShellThemeClasses = () => {
+    switch (theme) {
+      case "wikipedia":
+        return {
+          topbar: "border-neutral-200 bg-[#F8F9FA]",
+          tabActive: "bg-neutral-200 text-neutral-900",
+          tabIdle: "hover:bg-neutral-100 text-neutral-700",
+          select: "bg-[#F8F9FA] text-[#202122] border-neutral-300",
+          option: "bg-[#F8F9FA] text-[#202122]",
+          button: "border-neutral-300 hover:bg-neutral-100",
+          logout: "text-neutral-500 hover:text-neutral-800"
+        };
+      case "charcoal":
+        return {
+          topbar: "border-neutral-800 bg-neutral-950",
+          tabActive: "bg-neutral-800 text-neutral-100",
+          tabIdle: "hover:bg-neutral-800 text-neutral-300",
+          select: "bg-neutral-950 text-neutral-100 border-neutral-700",
+          option: "bg-neutral-950 text-neutral-100",
+          button: "border-neutral-700 hover:bg-neutral-800",
+          logout: "text-neutral-400 hover:text-neutral-100"
+        };
+      default:
+        return {
+          topbar: "border-[#E6E1D3] bg-[#EFEADF]",
+          tabActive: "bg-[#E2D9C8] text-neutral-900",
+          tabIdle: "hover:bg-[#E8E1D2] text-neutral-700",
+          select: "bg-[#F5F2EB] text-[#202122] border-[#D8CDBA]",
+          option: "bg-[#F5F2EB] text-[#202122]",
+          button: "border-[#D8CDBA] hover:bg-[#E8E1D2]",
+          logout: "text-neutral-500 hover:text-neutral-800"
+        };
+    }
+  };
+
+  const shellTheme = getShellThemeClasses();
+  const requiresUnlock = Boolean(user && !masterKey);
+  const dialogTheme = {
+    beige: {
+      panel: "bg-[#F5F2EB] border-[#D8CDBA] text-[#202122]",
+      muted: "text-neutral-600",
+      input: "bg-white/70 border-[#D8CDBA]",
+      cancel: "border border-[#D8CDBA] bg-[#EFEADF] text-[#202122] hover:bg-[#E8E1D2]",
+      primary: "bg-neutral-900 text-white hover:bg-neutral-800"
+    },
+    wikipedia: {
+      panel: "bg-[#F8F9FA] border-neutral-300 text-[#202122]",
+      muted: "text-neutral-600",
+      input: "bg-white border-neutral-300",
+      cancel: "border border-neutral-300 bg-white text-[#202122] hover:bg-neutral-100",
+      primary: "bg-[#202122] text-white hover:bg-neutral-700"
+    },
+    charcoal: {
+      panel: "bg-neutral-900 border-neutral-700 text-neutral-100",
+      muted: "text-neutral-400",
+      input: "bg-neutral-800 border-neutral-700",
+      cancel: "border border-neutral-700 bg-neutral-800 text-neutral-100 hover:bg-neutral-700",
+      primary: "bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
+    }
+  }[theme];
+
+  const confirmDialog = async () => {
+    const currentDialog = dialog;
+    if (!currentDialog) return;
+    if (currentDialog.kind === "input" && !currentDialog.value.trim()) return;
+    setDialog(null);
+    await currentDialog.onConfirm(currentDialog.value || "");
+  };
+
+  if (!user || requiresUnlock) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] font-serif p-6">
         <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8">
           <h2 className="text-2xl font-bold tracking-wider text-center mb-1">ArchiWiki</h2>
-          <p className="text-xs text-neutral-400 text-center uppercase tracking-widest mb-6">Encrypted Ledger Mode</p>
+          <p className="text-xs text-neutral-400 text-center uppercase tracking-widest mb-6">
+            {requiresUnlock ? "Unlock encrypted notes" : "Your encrypted personal Wikipedia"}
+          </p>
+
+          {requiresUnlock && (
+            <p className="mb-5 text-center text-xs text-neutral-500">
+              Enter your password to restore access to your encrypted notes.
+            </p>
+          )}
 
           <form onSubmit={handleAuthSubmit} className="space-y-4">
             <div>
@@ -226,9 +401,10 @@ const handleCreateNote = async (folderId = null) => {
               <input 
                 type="email" 
                 required 
-                value={email}
+                value={requiresUnlock ? user.email : email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800"
+                disabled={requiresUnlock}
+                className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800 disabled:cursor-not-allowed disabled:text-neutral-500"
               />
             </div>
             <div>
@@ -242,7 +418,7 @@ const handleCreateNote = async (folderId = null) => {
               />
             </div>
 
-            {isRegistering && (
+            {isRegistering && !requiresUnlock && (
               <div>
                 <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Invite Token</label>
                 <input 
@@ -262,18 +438,18 @@ const handleCreateNote = async (folderId = null) => {
               type="submit"
               className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-sm font-semibold tracking-wider transition-colors"
             >
-              {isRegistering ? "Register Account" : "Access Manuscript Ledger"}
+              {requiresUnlock ? "Unlock Notes" : isRegistering ? "Register Account" : "Access Your Encrypted Articles"}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-neutral-200 text-center">
+          {!requiresUnlock && <div className="mt-6 pt-4 border-t border-neutral-200 text-center">
             <button 
               onClick={() => setIsRegistering(!isRegistering)}
               className="text-xs text-neutral-500 hover:underline"
             >
               {isRegistering ? "Already invited? Login" : "Have an invite code? Register"}
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     );
@@ -281,72 +457,110 @@ const handleCreateNote = async (folderId = null) => {
 
   return (
     <div className={`h-screen flex overflow-hidden ${getThemeClasses()}`}>
+      <div className={`hidden md:block h-full ${isSidebarOpen ? "max-md:block" : ""}`}>
       <Sidebar 
+        theme={theme}
         folders={folders}
         notes={decryptedNotes}
         activeNoteId={activeNoteId}
-        onSelectNote={(id) => { setActiveNoteId(id); setActiveTab("editor"); }}
+        onSelectNote={(id) => {
+  setNewNoteId(null);
+  setActiveNoteId(id);
+  setActiveTab("editor");
+  window.history.pushState(
+    { noteId: id },
+    "",
+    `#note=${id}`
+  );
+}}
         onCreateFolder={handleCreateFolder}
         onCreateNote={handleCreateNote}
-        onRenameFolder={async (id) => {
-          const newName = prompt("Rename to:");
-          if (newName) await updateDoc(doc(db, "folders", id), { name: newName });
-        }}
+        onRenameFolder={(id) => setDialog({
+          kind: "input",
+          title: "Rename folder",
+          label: "Folder name",
+          value: folders.find((folder) => folder.id === id)?.name || "",
+          confirmLabel: "Rename",
+          onConfirm: (name) => updateDoc(doc(db, "folders", id), { name: name.trim() })
+        })}
         onDeleteFolder={handleDeleteFolder}
         onMoveItem={handleMoveItem}
-        onDeleteNote={async (id) => {
-          if (confirm("Delete this manuscript permanently?")) {
+        onDeleteNote={(id) => setDialog({
+          kind: "confirm",
+          title: "Delete note?",
+          message: "This article will be permanently deleted.",
+          confirmLabel: "Delete permanently",
+          destructive: true,
+          onConfirm: async () => {
             await deleteDoc(doc(db, "notes", id));
             if (activeNoteId === id) setActiveNoteId(null);
           }
-        }}
+        })}
       />
+      </div>
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button type="button" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 w-full bg-black/40" />
+          <div className="relative z-10 h-full w-64 shadow-xl">
+            <Sidebar 
+              theme={theme} folders={folders} notes={decryptedNotes} activeNoteId={activeNoteId}
+              onSelectNote={(id) => { setNewNoteId(null); setActiveNoteId(id); setActiveTab("editor"); setIsSidebarOpen(false); window.history.pushState({ noteId: id }, "", `#note=${id}`); }}
+              onCreateFolder={handleCreateFolder} onCreateNote={handleCreateNote}
+              onRenameFolder={(id) => setDialog({ kind: "input", title: "Rename folder", label: "Folder name", value: folders.find((folder) => folder.id === id)?.name || "", confirmLabel: "Rename", onConfirm: (name) => updateDoc(doc(db, "folders", id), { name: name.trim() }) })}
+              onDeleteFolder={handleDeleteFolder} onMoveItem={handleMoveItem}
+              onDeleteNote={(id) => setDialog({ kind: "confirm", title: "Delete note?", message: "This manuscript will be permanently deleted.", confirmLabel: "Delete permanently", destructive: true, onConfirm: async () => { await deleteDoc(doc(db, "notes", id)); if (activeNoteId === id) setActiveNoteId(null); } })}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         {/* Navigation Tabs */}
-        <div className="flex justify-between items-center px-6 py-2 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
-          <div className="flex gap-2">
+        <div className={`flex justify-between items-center gap-3 px-6 py-2 max-md:px-3 max-md:flex-wrap border-b ${shellTheme.topbar}`}>
+          <div className="flex gap-2 max-md:w-full">
+            <button type="button" onClick={() => setIsSidebarOpen(true)} className="md:hidden p-1" aria-label="Open navigation"><Menu size={18} /></button>
             <button
               onClick={() => setActiveTab("editor")}
               className={`px-3 py-1 rounded text-xs font-semibold ${
-                activeTab === "editor" ? "bg-neutral-200 dark:bg-neutral-800" : "hover:bg-neutral-100"
+                activeTab === "editor" ? shellTheme.tabActive : shellTheme.tabIdle
               }`}
             >
-              Manuscript Editor
+              Article Editor
             </button>
             <button
               onClick={() => setActiveTab("graph")}
               className={`px-3 py-1 rounded text-xs font-semibold ${
-                activeTab === "graph" ? "bg-neutral-200 dark:bg-neutral-800" : "hover:bg-neutral-100"
+                activeTab === "graph" ? shellTheme.tabActive : shellTheme.tabIdle
               }`}
             >
               Interactive Graph
             </button>
           </div>
 
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-2 md:gap-4 text-xs max-md:w-full max-md:justify-between">
             {/* Theme switcher */}
             <div className="flex items-center gap-1">
               <span>Theme:</span>
               <select 
                 value={theme} 
                 onChange={(e) => setTheme(e.target.value)}
-                className="bg-transparent border border-neutral-200 dark:border-neutral-800 rounded px-1 py-0.5 text-xs focus:outline-none"
+                className={`border rounded px-1 py-0.5 text-xs focus:outline-none ${shellTheme.select}`}
               >
-                <option value="beige">Warm Beige</option>
-                <option value="wikipedia">Wikipedia Light</option>
-                <option value="charcoal">OLED Dark</option>
+                <option className={shellTheme.option} value="beige">Warm Beige</option>
+                <option className={shellTheme.option} value="wikipedia">Wikipedia Light</option>
+                <option className={shellTheme.option} value="charcoal">OLED Dark</option>
               </select>
             </div>
 
             <button 
               onClick={exportAllToZip}
-              className="py-1 px-2.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded flex items-center gap-1"
+              className={`flex py-1 px-2.5 border rounded items-center gap-1 ${shellTheme.button}`}
             >
-              <Share2 size={12} /> Backup Backup (.json)
+              <Share2 size={12} /> <span className="hidden sm:inline">Backup (.json)</span><span className="sm:hidden">Backup</span>
             </button>
 
-            <button onClick={logout} className="p-1 text-neutral-500 hover:text-neutral-800">
+            <button onClick={logout} className={`p-1 ${shellTheme.logout}`}>
               <LogOut size={14} />
             </button>
           </div>
@@ -357,22 +571,60 @@ const handleCreateNote = async (folderId = null) => {
           {activeTab === "editor" ? (
             <Editor 
   theme={theme}
+  newNoteId={newNoteId}
   note={decryptedNotes.find(n => n.id === activeNoteId)}
   onSaveNote={handleSaveNote}
   notesPool={decryptedNotes}
-  userId={user.uid}
   fontSize={fontSize}
   setFontSize={setFontSize}
-  onNavigateToNote={(id) => setActiveNoteId(id)}
+  onNavigateToNote={(id) => {
+  setNewNoteId(null);
+  setActiveNoteId(id);
+  setActiveTab("editor");
+  window.history.pushState(
+    { noteId: id },
+    "",
+    `#note=${id}`
+  );
+}}
 />
           ) : (
             <GraphView 
+              theme={theme}
               notes={decryptedNotes}
-              onNavigateToNote={(id) => { setActiveNoteId(id); setActiveTab("editor"); }}
+              onNavigateToNote={(id) => {
+  setNewNoteId(null);
+  setActiveNoteId(id);
+  setActiveTab("editor");
+  window.history.pushState(
+    { noteId: id },
+    "",
+    `#note=${id}`
+  );
+}}
             />
           )}
         </div>
       </div>
+
+      {dialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+          <div className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme.panel}`}>
+            <h2 id="dialog-title" className="text-base font-semibold">{dialog.title}</h2>
+            {dialog.message && <p className={`mt-2 text-sm ${dialogTheme.muted}`}>{dialog.message}</p>}
+            {dialog.kind === "input" && (
+              <label className={`mt-4 block text-xs font-medium ${dialogTheme.muted}`}>
+                {dialog.label}
+                <input autoFocus value={dialog.value} onChange={(event) => setDialog((current) => ({ ...current, value: event.target.value }))} onKeyDown={(event) => event.key === "Enter" && confirmDialog()} className={`mt-1.5 w-full rounded border px-3 py-2 text-sm outline-none ${dialogTheme.input}`} />
+              </label>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDialog(null)} className={`rounded px-3 py-1.5 text-sm ${dialogTheme.cancel}`}>Cancel</button>
+              <button type="button" onClick={confirmDialog} className={`rounded px-3 py-1.5 text-sm font-medium ${dialog.destructive ? "bg-red-700 text-white hover:bg-red-800" : dialogTheme.primary}`}>{dialog.confirmLabel}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
