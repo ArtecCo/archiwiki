@@ -25,7 +25,6 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteToken, setInviteToken] = useState("");
-  const [masterPass, setMasterPass] = useState("");
   const [error, setError] = useState("");
 
   // Application States
@@ -78,19 +77,32 @@ export default function App() {
   }, [encryptedNotes, masterKey]);
 
   // Handling registration & login calls
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    try {
-      if (isRegistering) {
-        await registerWithInvite(email, password, inviteToken, masterPass);
-      } else {
-        await login(email, password, masterPass);
-      }
-    } catch (err) {
-      setError(err.message);
+  // Handling registration & login calls
+const handleAuthSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+
+  try {
+    if (isRegistering) {
+      await registerWithInvite(
+        email,
+        password,
+        inviteToken
+      );
+    } else {
+      await login(
+        email,
+        password
+      );
     }
-  };
+  } catch (err) {
+    console.error("Authentication error:", err);
+
+    setError(
+      err?.message || "Authentication failed. Please try again."
+    );
+  }
+};
 
   const handleCreateFolder = async (parentId = null) => {
     const name = prompt("Name your folder:");
@@ -231,18 +243,6 @@ export default function App() {
                 />
               </div>
             )}
-
-            <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Master Password (Local AES-256 Key)</label>
-              <input 
-                type="password" 
-                required 
-                value={masterPass}
-                onChange={(e) => setMasterPass(e.target.value)}
-                className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800"
-                placeholder="Never sent to server"
-              />
-            </div>
 
             {error && <p className="text-xs text-neutral-500 italic mt-2">{error}</p>}
 
