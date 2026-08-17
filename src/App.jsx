@@ -356,14 +356,15 @@ const handleCreateNote = async (folderId = null) => {
         <div className="flex-1 overflow-hidden">
           {activeTab === "editor" ? (
             <Editor 
-              note={decryptedNotes.find(n => n.id === activeNoteId)}
-              onSaveNote={handleSaveNote}
-              notesPool={decryptedNotes}
-              userId={user.uid}
-              fontSize={fontSize}
-              setFontSize={setFontSize}
-              onNavigateToNote={(id) => setActiveNoteId(id)}
-            />
+  note={decryptedNotes.find(n => n.id === activeNoteId)}
+  onSaveNote={handleSaveNote}
+  notesPool={decryptedNotes}
+  userId={user.uid}
+  fontSize={fontSize}
+  setFontSize={setFontSize}
+  onNavigateToNote={(id) => setActiveNoteId(id)}
+  theme={theme}
+/>
           ) : (
             <GraphView 
               notes={decryptedNotes}
