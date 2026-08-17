@@ -115,10 +115,18 @@ const handleAuthSubmit = async (e) => {
     });
   };
 
-  const handleCreateNote = async (folderId = null) => {
-    const defaultTitle = "Untitled Manuscript";
-    const defaultBody = "Start writing your encrypted notes...";
-    
+const handleCreateNote = async (folderId = null) => {
+  if (!masterKey) {
+    setError(
+      "Encryption key is unavailable. Please log out and log in again."
+    );
+    return;
+  }
+
+  const defaultTitle = "Untitled Manuscript";
+  const defaultBody = "Start writing your encrypted notes...";
+
+  try {
     await addDoc(collection(db, "notes"), {
       userId: user.uid,
       folderId,
@@ -126,7 +134,11 @@ const handleAuthSubmit = async (e) => {
       body: encryptData(defaultBody, masterKey),
       updatedAt: Date.now()
     });
-  };
+  } catch (err) {
+    console.error("Create note error:", err);
+    setError("Unable to create encrypted note.");
+  }
+};
 
   const handleSaveNote = async (noteId, rawTitle, rawBody) => {
     const noteRef = doc(db, "notes", noteId);
