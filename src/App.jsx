@@ -41,6 +41,13 @@ export default function App() {
   const [dialog, setDialog] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  useEffect(() => {
+  if (!user) {
+    setEmail("");
+    setPassword("");
+  }
+}, [user]);
+
   // Load Database Items
   useEffect(() => {
     if (!user) return;
@@ -151,7 +158,7 @@ const handleAuthSubmit = async (e) => {
   setError("");
 
   try {
-    if (isRegistering && !user) {
+    if (isRegistering) {
       await registerWithInvite(
         email,
         password,
@@ -159,7 +166,7 @@ const handleAuthSubmit = async (e) => {
       );
     } else {
       await login(
-        requiresUnlock ? user.email : email,
+        email,
         password
       );
     }
@@ -169,6 +176,10 @@ const handleAuthSubmit = async (e) => {
     setError(
       err?.message || "Authentication failed. Please try again."
     );
+  } finally {
+    // Never retain authentication credentials in React state
+    setEmail("");
+    setPassword("");
   }
 };
 
@@ -380,11 +391,21 @@ const handleCreateNote = async (folderId = null) => {
     await currentDialog.onConfirm(currentDialog.value || "");
   };
 
+  const handleLogout = async () => {
+  // Immediately clear authentication form state
+  setEmail("");
+  setPassword("");
+  setError("");
+
+  // Then terminate the Firebase session
+  await logout();
+};
+
   if (!user || requiresUnlock) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] font-serif p-6">
         <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8">
-          <h2 className="text-2xl font-bold tracking-wider text-center mb-1">ArchiWiki</h2>
+          <h2 className="text-2xl font-bold font-archi tracking-wider text-center mb-1">ArchiWiki</h2>
           <p className="text-xs text-neutral-400 text-center uppercase tracking-widest mb-6">
             {requiresUnlock ? "Unlock encrypted notes" : "Your encrypted personal Wikipedia"}
           </p>
@@ -395,12 +416,17 @@ const handleCreateNote = async (folderId = null) => {
             </p>
           )}
 
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
+          <form
+  onSubmit={handleAuthSubmit}
+  autoComplete="off"
+  className="space-y-4"
+>
             <div>
               <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Email</label>
               <input 
                 type="email" 
                 required 
+                autoComplete="off"
                 value={requiresUnlock ? user.email : email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={requiresUnlock}
@@ -411,7 +437,8 @@ const handleCreateNote = async (folderId = null) => {
               <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Password</label>
               <input 
                 type="password" 
-                required 
+                required
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800"
@@ -560,7 +587,7 @@ const handleCreateNote = async (folderId = null) => {
               <Share2 size={12} /> <span className="hidden sm:inline">Backup (.json)</span><span className="sm:hidden">Backup</span>
             </button>
 
-            <button onClick={logout} className={`p-1 ${shellTheme.logout}`}>
+            <button onClick={handleLogout} className={`p-1 ${shellTheme.logout}`}>
               <LogOut size={14} />
             </button>
           </div>
