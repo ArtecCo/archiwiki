@@ -356,6 +356,7 @@ const handleCreateNote = async (folderId = null) => {
         <div className="flex-1 overflow-hidden">
           {activeTab === "editor" ? (
             <Editor 
+  theme={theme}
   note={decryptedNotes.find(n => n.id === activeNoteId)}
   onSaveNote={handleSaveNote}
   notesPool={decryptedNotes}
@@ -363,7 +364,6 @@ const handleCreateNote = async (folderId = null) => {
   fontSize={fontSize}
   setFontSize={setFontSize}
   onNavigateToNote={(id) => setActiveNoteId(id)}
-  theme={theme}
 />
           ) : (
             <GraphView 
