@@ -32,6 +32,7 @@ export default function Editor({
   folderCount = 0,
   subfolderCount = 0,
   writingSince = "",
+  breadcrumb = "",
   theme = "beige"
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -111,6 +112,16 @@ export default function Editor({
     wikipedia: "bg-[#F8F9FA] border-neutral-300 text-[#202122]",
     charcoal: "bg-neutral-900 border-neutral-700 text-neutral-100"
   }[theme] || "bg-white border-neutral-200 text-[#202122]";
+
+
+  const currentHour = new Date().getHours();
+
+const greeting =
+  currentHour < 12
+    ? "Good morning!"
+    : currentHour < 18
+    ? "Good afternoon!"
+    : "Good evening!";
 
   /*
    * ---------------------------------------------------------
@@ -552,76 +563,565 @@ const enterEditMode = () => {
    * DIRECT PDF DOWNLOAD
    * ---------------------------------------------------------
    *
-   * No browser print dialog.
-   * No "Save as PDF" page.
+   * Minimal editorial PDF.
    *
-   * jsPDF writes the document directly, without capturing any UI elements.
+   * Design principles:
+   * - no oversized empty header area
+   * - one clean alignment grid
+   * - compact metadata
+   * - real selectable text
+   * - Markdown structure retained
+   * - restrained typography
    */
 
-  const triggerPdfDownload = () => {
-    if (!note) return;
+  
 
-    try {
-      const metrics = calculateMetrics();
-      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 18;
-      const contentWidth = pageWidth - margin * 2;
-      const footerTop = pageHeight - 22;
-      let cursorY = 24;
+const triggerPdfDownload = () => {
+  if (!note) return;
 
-      const addFooter = (pageNumber) => {
-        pdf.setDrawColor(210, 210, 210);
-        pdf.line(margin, footerTop - 5, pageWidth - margin, footerTop - 5);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8);
-        pdf.setTextColor(90, 90, 90);
-        pdf.text(`Words: ${metrics.words}  •  Lines: ${metrics.lines}  •  Headers: ${metrics.headers}`, margin, footerTop);
-        pdf.text(`Read time: ~${metrics.readingTime} min  •  Page ${pageNumber}`, pageWidth - margin, footerTop, { align: "right" });
-      };
+  try {
+    const metrics = calculateMetrics();
 
-      pdf.setFont("times", "bold");
-      pdf.setFontSize(22);
-      pdf.setTextColor(32, 33, 34);
-      const titleLines = pdf.splitTextToSize(title || "Untitled Note", contentWidth);
-      pdf.text(titleLines, margin, cursorY);
-      cursorY += titleLines.length * 9 + 5;
-      pdf.setDrawColor(210, 210, 210);
-      pdf.line(margin, cursorY, pageWidth - margin, cursorY);
-      cursorY += 9;
+    const pdf = new jsPDF({
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait"
+    });
 
-      pdf.setFont("times", "normal");
-      pdf.setFontSize(Math.max(10, Math.min(14, fontSize * 0.7)));
-      const plainText = body
-        .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-        .replace(/\[\[([^\]]+)\]\]/g, "$1")
-        .replace(/^[#>*\-+]\s*/gm, "")
-        .replace(/`{1,3}/g, "")
-        .replace(/\*{1,3}|_{1,3}/g, "");
-      const contentLines = pdf.splitTextToSize(plainText || " ", contentWidth);
-      const lineHeight = 6;
-      let pageNumber = 1;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-      contentLines.forEach((line) => {
-        if (cursorY + lineHeight > footerTop - 9) {
-          addFooter(pageNumber);
-          pdf.addPage();
-          pageNumber += 1;
-          cursorY = 24;
-        }
-        pdf.text(line, margin, cursorY);
-        cursorY += lineHeight;
+    const marginLeft = 18;
+    const marginRight = 18;
+    const top = 18;
+    const bottom = 18;
+
+    const contentWidth = pageWidth - marginLeft - marginRight;
+    const footerY = pageHeight - 10;
+    const bodyBottom = pageHeight - bottom - 10;
+
+    let y = top;
+    let pageNumber = 1;
+
+    const palette = {
+      text: [34, 34, 34],
+      muted: [105, 105, 105],
+      accent: [64, 94, 122],
+      rule: [205, 205, 205],
+      soft: [246, 246, 246],
+      quote: [248, 248, 248]
+    };
+
+    /*
+     * UTILITY HELPERS
+     */
+
+    const clean = (value) =>
+      String(value || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\u00a0/g, " ");
+
+    const plainInline = (value) =>
+      clean(value)
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, target, label) => label || target)
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\*\*\*(.*?)\*\*\*/g, "$1")
+        .replace(/___(.*?)___/g, "$1")
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/__(.*?)__/g, "$1")
+        .replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/g, "$1")
+        .replace(/(?<!_)_(?!_)(.*?)_(?!_)/g, "$1")
+        .trim();
+
+    const wrap = (value, size, font = "times", style = "normal", width = contentWidth) => {
+      pdf.setFont(font, style);
+      pdf.setFontSize(size);
+      return pdf.splitTextToSize(plainInline(value) || " ", width);
+    };
+
+    const rule = (yy = y, width = contentWidth) => {
+      pdf.setDrawColor(...palette.rule);
+      pdf.setLineWidth(0.25);
+      pdf.line(marginLeft, yy, marginLeft + width, yy);
+    };
+
+    const pageFooter = () => {
+      pdf.setDrawColor(...palette.rule);
+      pdf.setLineWidth(0.2);
+      pdf.line(marginLeft, pageHeight - 14, pageWidth - marginRight, pageHeight - 14);
+
+      const websiteUrl = typeof window !== "undefined" ? window.location.origin : "";
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(...palette.accent);
+
+      const websiteName = "ArchiWiki";
+
+      pdf.textWithLink(websiteName, marginLeft, footerY, {
+        url: websiteUrl || "https://localhost"
       });
 
-      addFooter(pageNumber);
-      pdf.save(`${sanitizeFilename(title || "Untitled Note")}.pdf`);
-    } catch (err) {
-      console.error("PDF export error:", err);
-      setPdfError(true);
+      const linkWidth = pdf.getTextWidth(websiteName);
+      pdf.setDrawColor(...palette.accent);
+      pdf.setLineWidth(0.15);
+      pdf.line(marginLeft, footerY + 0.8, marginLeft + linkWidth, footerY + 0.8);
+
+      pdf.setTextColor(...palette.muted);
+      pdf.text(String(pageNumber), pageWidth - marginRight, footerY, { align: "right" });
+    };
+
+    const newPage = () => {
+      pageFooter();
+      pdf.addPage();
+      pageNumber += 1;
+      y = top;
+    };
+
+    const ensure = (height) => {
+      if (y + height > bodyBottom) {
+        newPage();
+        return true;
+      }
+      return false;
+    };
+
+    const drawWrapped = (lines, x, yy, size, font, style, lineHeight) => {
+      pdf.setFont(font, style);
+      pdf.setFontSize(size);
+      pdf.setTextColor(...palette.text);
+
+      lines.forEach((line, index) => {
+        pdf.text(line, x, yy + index * lineHeight + size * 0.35);
+      });
+
+      return lines.length * lineHeight;
+    };
+
+    /*
+     * BLOCK RENDERERS
+     */
+
+    const addParagraph = (value) => {
+      const text = plainInline(value);
+      if (!text) {
+        y += 2.5;
+        return;
+      }
+
+      const size = 11;
+      const lineHeight = 5.8;
+      const lines = wrap(text, size, "times", "normal");
+
+      if (lines.length > 1 && y + lineHeight * 2 > bodyBottom) {
+        newPage();
+      }
+
+      const height = drawWrapped(lines, marginLeft, y, size, "times", "normal", lineHeight);
+      y += height + 4;
+    };
+
+    const addHeading = (value, level) => {
+      const sizes = { 1: 16, 2: 13.5, 3: 12, 4: 11, 5: 10.5, 6: 10 };
+      const size = sizes[level] || 10;
+      const lineHeight = level <= 2 ? 6.5 : 5.8;
+      const lines = wrap(value, size, "times", "bold");
+
+      const required = lines.length * lineHeight + (level <= 2 ? 8 : 4);
+      if (y + required > bodyBottom) {
+        newPage();
+      }
+
+      y += level === 1 ? 3 : 5;
+      const height = drawWrapped(lines, marginLeft, y, size, "times", "bold", lineHeight);
+      y += height + 3;
+
+      if (level <= 2) {
+        rule(y, level === 1 ? contentWidth : contentWidth * 0.55);
+        y += 4.5;
+      }
+    };
+
+    const addListItem = (value, ordered, number, level) => {
+      const indent = Math.min(level, 4) * 5;
+      const marker = ordered ? `${number}.` : "•";
+      const size = 11;
+      const lineHeight = 5.6;
+      const textWidth = contentWidth - indent - 7;
+      const lines = wrap(value, size, "times", "normal", textWidth);
+
+      if (y + lineHeight > bodyBottom) {
+        newPage();
+      }
+
+      pdf.setFont("times", "normal");
+      pdf.setFontSize(size);
+      pdf.setTextColor(...palette.text);
+
+      pdf.text(marker, marginLeft + indent, y + 3.5);
+
+      lines.forEach((l, idx) => {
+        pdf.text(l, marginLeft + indent + 7, y + idx * lineHeight + 3.5);
+      });
+
+      y += lines.length * lineHeight + 2;
+    };
+
+    const addQuote = (values) => {
+      const text = values.map((line) => line.replace(/^>\s?/, "")).join(" ");
+      const size = 10;
+      const lineHeight = 5.2;
+      const lines = wrap(text, size, "times", "italic", contentWidth - 12);
+      const boxHeight = lines.length * lineHeight + 6;
+
+      if (y + boxHeight > bodyBottom) {
+        newPage();
+      }
+
+      pdf.setFillColor(...palette.quote);
+      pdf.roundedRect(marginLeft, y, contentWidth, boxHeight, 1, 1, "F");
+
+      pdf.setDrawColor(...palette.accent);
+      pdf.setLineWidth(0.8);
+      pdf.line(marginLeft + 1, y + 1, marginLeft + 1, y + boxHeight - 1);
+
+      pdf.setFont("times", "italic");
+      pdf.setFontSize(size);
+      pdf.setTextColor(...palette.text);
+
+      lines.forEach((l, idx) => {
+        pdf.text(l, marginLeft + 6, y + 3 + idx * lineHeight + size * 0.35);
+      });
+
+      y += boxHeight + 5;
+    };
+
+    const addCode = (code) => {
+      const size = 8.5;
+      const lineHeight = 4.5;
+      const allLines = pdf.splitTextToSize(clean(code).trim() || " ", contentWidth - 10);
+
+      let index = 0;
+
+      while (index < allLines.length) {
+        const available = Math.max(
+          1,
+          Math.floor((bodyBottom - y - 6) / lineHeight)
+        );
+
+        if (available <= 1) {
+          newPage();
+          continue;
+        }
+
+        const chunk = allLines.slice(index, index + available);
+        const boxHeight = chunk.length * lineHeight + 6;
+
+        pdf.setFillColor(...palette.soft);
+        pdf.roundedRect(marginLeft, y, contentWidth, boxHeight, 1, 1, "F");
+
+        pdf.setFont("courier", "normal");
+        pdf.setFontSize(size);
+        pdf.setTextColor(...palette.text);
+
+        chunk.forEach((l, idx) => {
+          pdf.text(l, marginLeft + 5, y + 3 + idx * lineHeight + size * 0.35);
+        });
+
+        y += boxHeight + 5;
+        index += chunk.length;
+
+        if (index < allLines.length) {
+          newPage();
+        }
+      }
+    };
+
+    const addTable = (rows) => {
+      if (!rows.length) return;
+
+      const cells = rows.map((row) =>
+        row
+          .trim()
+          .replace(/^\||\|$/g, "")
+          .split("|")
+          .map((cell) => plainInline(cell.trim()))
+      );
+
+      const columnCount = Math.max(...cells.map((row) => row.length));
+
+      const normalized = cells.map((row) => {
+        const copy = [...row];
+        while (copy.length < columnCount) copy.push("");
+        return copy;
+      });
+
+      if (
+        normalized.length >= 2 &&
+        normalized[1].every((cell) => /^:?-{3,}:?$/.test(cell))
+      ) {
+        normalized.splice(1, 1);
+      }
+
+      if (!normalized.length) return;
+
+      const columnWidth = contentWidth / columnCount;
+      const cellPadding = 2.5;
+      const fontSize = 8.5;
+      const lineHeight = 4.5;
+
+      let rowIndex = 0;
+
+      while (rowIndex < normalized.length) {
+        const row = normalized[rowIndex];
+        const cellLines = row.map((cell) =>
+          pdf.splitTextToSize(cell || " ", Math.max(10, columnWidth - cellPadding * 2))
+        );
+
+        const rowHeight = Math.max(
+          ...cellLines.map((lines) => lines.length * lineHeight + cellPadding * 2)
+        );
+
+        if (y + rowHeight > bodyBottom) {
+          newPage();
+        }
+
+        if (rowIndex === 0) {
+          pdf.setFillColor(...palette.soft);
+          pdf.rect(marginLeft, y, contentWidth, rowHeight, "F");
+        }
+
+        pdf.setDrawColor(...palette.rule);
+        pdf.setLineWidth(0.2);
+
+        for (let column = 0; column < columnCount; column += 1) {
+          const x = marginLeft + column * columnWidth;
+          pdf.rect(x, y, columnWidth, rowHeight);
+
+          pdf.setFont("helvetica", rowIndex === 0 ? "bold" : "normal");
+          pdf.setFontSize(fontSize);
+          pdf.setTextColor(...palette.text);
+
+          cellLines[column].forEach((l, idx) => {
+            pdf.text(l, x + cellPadding, y + cellPadding + idx * lineHeight + fontSize * 0.35);
+          });
+        }
+
+        y += rowHeight;
+        rowIndex += 1;
+      }
+
+      y += 5;
+    };
+
+    /*
+     * MARKDOWN PARSER
+     */
+
+    const renderMarkdown = (markdown) => {
+      const lines = clean(markdown).split("\n");
+      let index = 0;
+
+      while (index < lines.length) {
+        const raw = lines[index];
+        const line = raw.trim();
+
+        if (!line) {
+          y += 2.5;
+          index += 1;
+          continue;
+        }
+
+        if (line.startsWith("```")) {
+          const code = [];
+          index += 1;
+
+          while (index < lines.length && !lines[index].trim().startsWith("```")) {
+            code.push(lines[index]);
+            index += 1;
+          }
+
+          if (index < lines.length) {
+            index += 1;
+          }
+
+          addCode(code.join("\n"));
+          continue;
+        }
+
+        if (
+          line.includes("|") &&
+          index + 1 < lines.length &&
+          /^\s*\|?\s*:?-{3,}/.test(lines[index + 1])
+        ) {
+          const rows = [];
+
+          while (index < lines.length && lines[index].trim().includes("|")) {
+            rows.push(lines[index]);
+            index += 1;
+          }
+
+          addTable(rows);
+          continue;
+        }
+
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+          addHeading(heading[2], heading[1].length);
+          index += 1;
+          continue;
+        }
+
+        if (line.startsWith(">")) {
+          const values = [];
+
+          while (index < lines.length && lines[index].trim().startsWith(">")) {
+            values.push(lines[index]);
+            index += 1;
+          }
+
+          addQuote(values);
+          continue;
+        }
+
+        const unordered = raw.match(/^(\s*)[-*+]\s+(.+)$/);
+        if (unordered) {
+          const level = Math.floor(unordered[1].length / 2);
+          addListItem(unordered[2], false, 0, level);
+          index += 1;
+          continue;
+        }
+
+        const ordered = raw.match(/^(\s*)(\d+)[.)]\s+(.+)$/);
+        if (ordered) {
+          const level = Math.floor(ordered[1].length / 2);
+          addListItem(ordered[3], true, Number(ordered[2]), level);
+          index += 1;
+          continue;
+        }
+
+        if (
+          /^(\*\s*){3,}$/.test(line) ||
+          /^(-\s*){3,}$/.test(line) ||
+          /^(_\s*){3,}$/.test(line)
+        ) {
+          if (y + 5 > bodyBottom) {
+            newPage();
+          }
+
+          rule();
+          y += 5;
+          index += 1;
+          continue;
+        }
+
+        const paragraph = [line];
+        index += 1;
+
+        while (index < lines.length) {
+          const nextRaw = lines[index];
+          const next = nextRaw.trim();
+
+          if (!next) break;
+          if (/^#{1,6}\s+/.test(next)) break;
+          if (/^```/.test(next)) break;
+          if (/^>/.test(next)) break;
+          if (/^(\s*)[-*+]\s+/.test(nextRaw)) break;
+          if (/^(\s*)\d+[.)]\s+/.test(nextRaw)) break;
+          if (
+            next.includes("|") &&
+            index + 1 < lines.length &&
+            /^\s*\|?\s*:?-{3,}/.test(lines[index + 1])
+          ) {
+            break;
+          }
+
+          paragraph.push(next);
+          index += 1;
+        }
+
+        addParagraph(paragraph.join(" "));
+      }
+    };
+
+    /*
+     * HEADER EXECUTION
+     */
+
+    if (typeof articleBreadcrumb !== "undefined" && articleBreadcrumb) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...palette.muted);
+      const breadcrumbLines = pdf.splitTextToSize(articleBreadcrumb, contentWidth);
+      breadcrumbLines.forEach((bLine, i) => {
+        pdf.text(bLine, marginLeft, y + i * 4.2 + 2.8);
+      });
+      y += breadcrumbLines.length * 4.2 + 3;
     }
-  };
+
+    const titleLines = wrap(title || "Untitled Note", 18, "times", "bold");
+    const titleLineHeight = 7.5;
+
+    ensure(titleLines.length * titleLineHeight + 10);
+    const titleHeight = drawWrapped(titleLines, marginLeft, y, 18, "times", "bold", titleLineHeight);
+    y += titleHeight + 4;
+
+    rule(y);
+    y += 5;
+
+    /*
+     * METADATA GRID EXECUTION
+     */
+
+    const metadata = [
+      `${metrics.words.toLocaleString()} Words`,
+      `${metrics.characters.toLocaleString()} Characters`,
+      `${metrics.paragraphs} Paragraphs`,
+      `${metrics.headings} Headings`,
+      `${metrics.wikiLinks} Wiki links`,
+      `Updated: ${typeof updatedAtText !== "undefined" ? updatedAtText : ""}`
+    ];
+
+    const columns = 3;
+    const rows = 2;
+    const columnGap = 6;
+    const cellWidth = (contentWidth - columnGap * (columns - 1)) / columns;
+    const metadataRowHeight = 5.5;
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...palette.muted);
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const index = row * columns + column;
+        const x = marginLeft + column * (cellWidth + columnGap);
+        pdf.text(metadata[index], x, y + row * metadataRowHeight + 3);
+      }
+    }
+
+    y += rows * metadataRowHeight + 4;
+
+    rule(y);
+    y += 6;
+
+    /*
+     * RENDER MARKDOWN & SAVE
+     */
+
+    renderMarkdown(body);
+    pageFooter();
+
+    pdf.save(`${sanitizeFilename(title || "Untitled Note")}.pdf`);
+  } catch (err) {
+    console.error("PDF export error:", err);
+    setPdfError(true);
+  }
+};
+
 
   const sanitizeFilename = (
     value
@@ -643,41 +1143,106 @@ const enterEditMode = () => {
    */
 
   const calculateMetrics = () => {
-    const words =
-      body.trim()
-        ? body
-            .trim()
-            .split(/\s+/)
-            .length
-        : 0;
+    const raw = String(body || "");
 
-    const lines =
-      body.split("\n").length;
+    const words = raw.trim()
+      ? raw.trim().split(/\s+/).length
+      : 0;
 
-    const headers =
-      (
-        body.match(
-          /^#{1,6}\s+/gm
-        ) || []
-      ).length;
+    const characters = raw.length;
 
-    const readingTime =
-      Math.ceil(words / 200);
+    const paragraphs = raw
+      .split(/\n\s*\n/)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .length;
+
+    const headings = (
+      raw.match(/^#{1,6}\s+.+$/gm) || []
+    ).length;
+
+    const wikiLinks = (
+      raw.match(/\[\[[^\]]+\]\]/g) || []
+    ).length;
 
     return {
       words,
-      lines,
-      headers,
-      readingTime
+      characters,
+      paragraphs,
+      headings,
+      wikiLinks
     };
   };
 
   const {
     words,
-    lines,
-    headers,
-    readingTime
+    characters,
+    paragraphs,
+    headings,
+    wikiLinks
   } = calculateMetrics();
+
+  const formatUpdatedAt = (value) => {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "Unknown";
+    }
+
+    let timestamp = Number(value);
+
+    if (!Number.isFinite(timestamp)) {
+      return "Unknown";
+    }
+
+    if (timestamp < 1_000_000_000_000) {
+      timestamp *= 1000;
+    }
+
+    const date = new Date(timestamp);
+
+    if (Number.isNaN(date.getTime())) {
+      return "Unknown";
+    }
+
+    return date.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    });
+  };
+
+  const updatedAtText =
+    formatUpdatedAt(note?.updatedAt);
+
+  /*
+   * Canonical breadcrumb used by the reader top bar
+   * and PDF. The App supplies the complete folder path.
+   */
+  const formatArticleBreadcrumb = (value) => {
+    const parts = String(value || "")
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter(
+        (part) =>
+          part.toLowerCase() !== "root" &&
+          part.toLowerCase() !== "archiwiki"
+      );
+
+    return [
+      "ArchiWiki",
+      ...parts
+    ].join(" > ");
+  };
+
+  const articleBreadcrumb =
+    formatArticleBreadcrumb(breadcrumb);
 
   /*
    * ---------------------------------------------------------
@@ -700,14 +1265,13 @@ const enterEditMode = () => {
    * ---------------------------------------------------------
    */
 
-  if (!note) {
+if (!note) {
   return (
     <div
-      className={`flex-1 flex flex-col items-center justify-center ${colors.page} font-serif px-6 py-12`}
+      className={`h-full w-full flex items-center justify-center ${colors.page} font-serif px-6 py-12`}
     >
       <div className="w-full max-w-2xl text-center">
 
-        {/* Welcome */}
         <BookOpen
           size={34}
           strokeWidth={1}
@@ -715,21 +1279,18 @@ const enterEditMode = () => {
         />
 
         <h1 className="text-3xl md:text-4xl font-medium tracking-wide mb-3">
-          Welcome to ArchiWiki
+          {greeting}
         </h1>
 
         <p
           className={`text-sm md:text-base italic leading-relaxed max-w-md mx-auto ${colors.muted}`}
         >
-          A quiet place to write, organise, and preserve the
-          things worth remembering.
+          Glimpse of your digital brain
         </p>
 
-        {/* Metrics */}
         <div className="mt-12 flex items-center justify-center">
           <div className="flex items-center">
 
-            {/* Articles */}
             <div className="px-6 md:px-10 text-center">
               <div className="text-2xl md:text-3xl font-medium">
                 {articleCount}
@@ -742,7 +1303,6 @@ const enterEditMode = () => {
 
             <div className={`h-10 w-px ${colors.border}`} />
 
-            {/* Folders */}
             <div className="px-6 md:px-10 text-center">
               <div className="text-2xl md:text-3xl font-medium">
                 {folderCount}
@@ -755,7 +1315,6 @@ const enterEditMode = () => {
 
             <div className={`h-10 w-px ${colors.border}`} />
 
-            {/* Subfolders */}
             <div className="px-6 md:px-10 text-center">
               <div className="text-2xl md:text-3xl font-medium">
                 {subfolderCount}
@@ -769,7 +1328,6 @@ const enterEditMode = () => {
           </div>
         </div>
 
-        {/* Writing since */}
         {writingSince && (
           <p className="mt-10 text-[10px] uppercase tracking-[0.2em] text-neutral-400">
             Writing since {writingSince}
@@ -799,13 +1357,13 @@ const enterEditMode = () => {
         className={`flex items-center justify-between gap-3 border-b ${colors.border} px-6 py-3 max-md:px-3 ${colors.toolbar}`}
       >
         <div className="flex items-center gap-2 text-xs font-sans text-neutral-500">
-          <span className="font-medium">
-            ArchiWiki
+          <span className="font-medium truncate">
+            {articleBreadcrumb}
           </span>
 
           <span>&gt;</span>
 
-          <span className="font-medium text-neutral-700">
+          <span className="font-medium text-neutral-700 truncate">
             {note.title ||
               "Untitled"}
           </span>
@@ -1111,29 +1669,31 @@ const enterEditMode = () => {
 
             <div
               id="print-container"
-              className="flex-1 prose max-w-4xl mr-auto font-serif leading-loose text-left"
+              className="flex-1 overflow-y-auto"
               onClick={
                 handleHtmlClick
               }
             >
-              <h1 className="text-3xl font-bold border-b border-neutral-300 pb-4 mb-6 tracking-wide">
-                {title ||
-                  "Untitled Note"}
-              </h1>
+              <div className="prose max-w-4xl mr-auto font-serif leading-loose text-left">
+                <h1 className="text-2xl font-bold border-b border-neutral-300 pb-3 mb-5 tracking-wide">
+                  {title ||
+                    "Untitled Note"}
+                </h1>
 
-              <div
-                className={
-                  theme === "charcoal"
-                    ? "text-neutral-100"
-                    : "text-neutral-800"
-                }
-                dangerouslySetInnerHTML={{
-                  __html:
-                    parseWikiLinks(
-                      body
-                    )
-                }}
-              />
+                <div
+                  className={
+                    theme === "charcoal"
+                      ? "text-neutral-100"
+                      : "text-neutral-800"
+                  }
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      parseWikiLinks(
+                        body
+                      )
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -1198,31 +1758,35 @@ const enterEditMode = () => {
         <div className="flex gap-4">
           <span>
             Words:{" "}
-            <strong>
-              {words}
-            </strong>
+            <strong>{words}</strong>
           </span>
 
           <span>
-            Lines:{" "}
-            <strong>
-              {lines}
-            </strong>
+            Characters:{" "}
+            <strong>{characters}</strong>
           </span>
 
           <span>
-            Headers:{" "}
-            <strong>
-              {headers}
-            </strong>
+            Paragraphs:{" "}
+            <strong>{paragraphs}</strong>
+          </span>
+
+          <span>
+            Headings:{" "}
+            <strong>{headings}</strong>
+          </span>
+
+          <span>
+            Wiki Links:{" "}
+            <strong>{wikiLinks}</strong>
           </span>
         </div>
 
         <div className="flex gap-4">
           <span>
-            Read Time: ~
+            Updated:{" "}
             <strong>
-              {readingTime} min
+              {updatedAtText}
             </strong>
           </span>
 
@@ -1240,6 +1804,7 @@ const enterEditMode = () => {
           </span>
         </div>
       </div>
+
 
       {pdfError && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="pdf-error-title">
