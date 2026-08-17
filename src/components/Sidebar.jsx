@@ -24,7 +24,7 @@ export default function Sidebar({
   onDeleteNote
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedFolders, setExpandedFolders] = useState({});
+  const [expandedFolders, setExpandedFolders] = useState(() => ({}));
   const [contextMenu, setContextMenu] = useState(null);
 
   const themeClasses = {
@@ -81,12 +81,32 @@ export default function Sidebar({
   const colors = themeClasses[theme] || themeClasses.beige;
 
 
+  // const toggleFolder = (id) => {
+  //   setExpandedFolders((prev) => ({
+  //     ...prev,
+  //     [id]: !prev[id]
+  //   }));
+  // };
+
   const toggleFolder = (id) => {
-    setExpandedFolders((prev) => ({
+  setExpandedFolders((prev) => {
+    const next = {
       ...prev,
       [id]: !prev[id]
-    }));
-  };
+    };
+
+    console.log(
+      "[ArchiWiki] Folder toggle:",
+      id,
+      "expanded:",
+      next[id],
+      "state:",
+      next
+    );
+
+    return next;
+  });
+};
 
   // -----------------------------
   // Drag and Drop
@@ -394,58 +414,100 @@ const filteredFolders = folders.filter((folder) =>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
         {searchQuery ? (
-          <div>
-            <h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-2">
-              Search Results
-            </h3>
+  <div>
+    <h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-2">
+      Search Results
+    </h3>
 
-            {filteredNotes.length === 0 ? (
-              <p className="text-xs text-neutral-400 px-3 py-2">
-                No notes found.
-              </p>
-            ) : (
-              filteredNotes.map((note) => (
-                <div
-                  key={note.id}
-                  onClick={() =>
-                    onSelectNote(note.id)
-                  }
-                  className={`group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
-                    activeNoteId === note.id
-                      ? colors.activeItem
-                      : colors.idleItem
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 truncate min-w-0">
-                    <FileText
-                      size={13}
-                      className="shrink-0"
-                    />
+    {/* Files */}
+    {filteredNotes.length > 0 && (
+      <div>
+        <h4 className="text-[9px] uppercase tracking-[0.16em] font-semibold text-neutral-400 px-3 mb-1.5">
+          Files
+        </h4>
 
-                    <span className="truncate">
-                      {note.title || "Untitled"}
-                    </span>
-                  </div>
+        {filteredNotes.map((note) => (
+          <div
+            key={note.id}
+            onClick={() => onSelectNote(note.id)}
+            className={`group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
+              activeNoteId === note.id
+                ? colors.activeItem
+                : colors.idleItem
+            }`}
+          >
+            <div className="flex items-center gap-1.5 truncate min-w-0">
+              <FileText
+                size={13}
+                className="shrink-0"
+              />
 
-                  <button
-                    type="button"
-                    onClick={(e) =>
-                      handleDeleteNote(
-                        e,
-                        note.id
-                      )
-                    }
-                    title="Delete note"
-                    aria-label="Delete note"
-                    className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))
-            )}
+              <span className="truncate">
+                {note.title || "Untitled"}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) =>
+                handleDeleteNote(e, note.id)
+              }
+              title="Delete note"
+              aria-label="Delete note"
+              className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
-        ) : (
+        ))}
+      </div>
+    )}
+
+    {/* Separator */}
+    {filteredNotes.length > 0 && filteredFolders.length > 0 && (
+      <div className={`my-3 border-t ${colors.divider}`} />
+    )}
+
+    {/* Folders */}
+    {filteredFolders.length > 0 && (
+      <div>
+        <h4 className="text-[9px] uppercase tracking-[0.16em] font-semibold text-neutral-400 px-3 mb-1.5">
+          Folders
+        </h4>
+
+        {filteredFolders.map((folder) => (
+          <div
+            key={folder.id}
+            onClick={() => {
+  setExpandedFolders((prev) => ({
+    ...prev,
+    [folder.id]: true
+  }));
+}}
+            className={`flex items-center gap-1.5 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${colors.folderText}`}
+          >
+            <Folder
+              size={13}
+              className={`${colors.folderFill} text-neutral-500 shrink-0`}
+            />
+
+            <span className="truncate">
+              {folder.name}
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* No Results */}
+    {filteredNotes.length === 0 &&
+      filteredFolders.length === 0 && (
+        <p className="text-xs text-neutral-400 px-3 py-2">
+          No results found.
+        </p>
+      )}
+  </div>
+) : (
           <>
             {rootFolders.map((folder) =>
               renderFolderNode(folder.id)
