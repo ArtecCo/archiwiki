@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
-import html2pdf from "html2pdf.js";
+import { jsPDF } from "jspdf";
 import {
   Eye,
   Edit,
   Save,
   BookOpen,
   Download,
-  AlertTriangle,
   FileText,
   Bold,
   Italic,
@@ -18,13 +17,12 @@ import {
   Code,
   Link as LinkIcon
 } from "lucide-react";
-import { acquireLock, releaseLock } from "../firebase";
 
 export default function Editor({
   note,
+  newNoteId,
   onSaveNote,
   notesPool = [],
-  userId,
   fontSize,
   setFontSize,
   onNavigateToNote,
@@ -34,17 +32,10 @@ export default function Editor({
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
 
-  const [lockStatus, setLockStatus] = useState({
-    success: true,
-    lockedBy: null
-  });
-
   const [wikiSuggest, setWikiSuggest] = useState(null);
+  const [pdfError, setPdfError] = useState(false);
 
   const textareaRef = useRef(null);
-  const sessionToken = useRef(
-    Math.random().toString(36).substring(2)
-  ).current;
 
   /*
    * ---------------------------------------------------------
@@ -109,6 +100,11 @@ export default function Editor({
   };
 
   const colors = themeClasses[theme] || themeClasses.beige;
+  const dialogTheme = {
+    beige: "bg-[#F5F2EB] border-[#D8CDBA] text-[#202122]",
+    wikipedia: "bg-[#F8F9FA] border-neutral-300 text-[#202122]",
+    charcoal: "bg-neutral-900 border-neutral-700 text-neutral-100"
+  }[theme] || "bg-white border-neutral-200 text-[#202122]";
 
   /*
    * ---------------------------------------------------------
@@ -121,62 +117,29 @@ export default function Editor({
 
     setTitle(note.title || "");
     setBody(note.body || "");
-    setIsEditing(false);
     setWikiSuggest(null);
-
-    checkAndAcquireLock();
-
-    return () => {
-      releaseLock(note.id, sessionToken);
-    };
+    setIsEditing(false);
   }, [note?.id]);
 
-  /*
-   * ---------------------------------------------------------
-   * LOCK HEARTBEAT
-   * ---------------------------------------------------------
-   */
+useEffect(() => {
+  if (!note || newNoteId !== note.id) return;
 
-  useEffect(() => {
-    if (!note || !isEditing) return;
+  setIsEditing(true);
 
-    const interval = setInterval(() => {
-      acquireLock(
-        note.id,
-        userId,
-        sessionToken
-      );
-    }, 60000);
+  requestAnimationFrame(() => {
+    textareaRef.current?.focus();
+  });
+}, [note?.id, newNoteId]);
 
-    return () => clearInterval(interval);
-  }, [note?.id, isEditing, userId]);
+const enterEditMode = () => {
+  if (!note) return;
 
-  const checkAndAcquireLock = async () => {
-    if (!note) return;
+  setIsEditing(true);
 
-    try {
-      const res = await acquireLock(
-        note.id,
-        userId,
-        sessionToken
-      );
-
-      setLockStatus(res);
-
-      if (!res.success) {
-        setIsEditing(false);
-      }
-    } catch (err) {
-      console.error("Lock error:", err);
-
-      setLockStatus({
-        success: false,
-        lockedBy: "another session"
-      });
-
-      setIsEditing(false);
-    }
-  };
+  requestAnimationFrame(() => {
+    textareaRef.current?.focus();
+  });
+};
 
   /*
    * ---------------------------------------------------------
@@ -586,155 +549,72 @@ export default function Editor({
    * No browser print dialog.
    * No "Save as PDF" page.
    *
-   * html2pdf.js creates and downloads the PDF directly.
+   * jsPDF writes the document directly, without capturing any UI elements.
    */
 
-  const triggerPdfDownload = async () => {
+  const triggerPdfDownload = () => {
     if (!note) return;
 
-    const pdfContainer =
-      document.createElement("div");
-
-    pdfContainer.style.position =
-      "fixed";
-
-    pdfContainer.style.left =
-      "-100000px";
-
-    pdfContainer.style.top = "0";
-
-    pdfContainer.style.width =
-      "794px";
-
-    pdfContainer.style.background =
-      "white";
-
-    pdfContainer.style.color =
-      "#202122";
-
-    pdfContainer.style.padding =
-      "60px";
-
-    pdfContainer.style.boxSizing =
-      "border-box";
-
-    pdfContainer.innerHTML = `
-      <div
-        style="
-          font-family: Georgia, 'Times New Roman', serif;
-          color: #202122;
-          background: white;
-          width: 100%;
-          line-height: 1.7;
-          font-size: ${fontSize}px;
-        "
-      >
-        <h1
-          style="
-            font-family: Georgia, 'Times New Roman', serif;
-            font-size: 32px;
-            line-height: 1.25;
-            margin: 0 0 30px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid #d4d4d4;
-            color: #202122;
-          "
-        >
-          ${escapeHtml(title || "Untitled Note")}
-        </h1>
-
-        <div
-          style="
-            font-family: Georgia, 'Times New Roman', serif;
-            color: #202122;
-          "
-        >
-          ${parseWikiLinks(body)}
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(
-      pdfContainer
-    );
-
-    const options = {
-      margin: [15, 15, 15, 15],
-
-      filename:
-        `${sanitizeFilename(
-          title || "Untitled Note"
-        )}.pdf`,
-
-      image: {
-        type: "jpeg",
-        quality: 0.98
-      },
-
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff"
-      },
-
-      jsPDF: {
-        unit: "mm",
-        format: "a4",
-        orientation: "portrait"
-      },
-
-      pagebreak: {
-        mode: [
-          "avoid-all",
-          "css",
-          "legacy"
-        ]
-      }
-    };
-
     try {
-      await html2pdf()
-        .set(options)
-        .from(pdfContainer)
-        .save();
+      const metrics = calculateMetrics();
+      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 18;
+      const contentWidth = pageWidth - margin * 2;
+      const footerTop = pageHeight - 22;
+      let cursorY = 24;
+
+      const addFooter = (pageNumber) => {
+        pdf.setDrawColor(210, 210, 210);
+        pdf.line(margin, footerTop - 5, pageWidth - margin, footerTop - 5);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(90, 90, 90);
+        pdf.text(`Words: ${metrics.words}  •  Lines: ${metrics.lines}  •  Headers: ${metrics.headers}`, margin, footerTop);
+        pdf.text(`Read time: ~${metrics.readingTime} min  •  Page ${pageNumber}`, pageWidth - margin, footerTop, { align: "right" });
+      };
+
+      pdf.setFont("times", "bold");
+      pdf.setFontSize(22);
+      pdf.setTextColor(32, 33, 34);
+      const titleLines = pdf.splitTextToSize(title || "Untitled Note", contentWidth);
+      pdf.text(titleLines, margin, cursorY);
+      cursorY += titleLines.length * 9 + 5;
+      pdf.setDrawColor(210, 210, 210);
+      pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+      cursorY += 9;
+
+      pdf.setFont("times", "normal");
+      pdf.setFontSize(Math.max(10, Math.min(14, fontSize * 0.7)));
+      const plainText = body
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+        .replace(/\[\[([^\]]+)\]\]/g, "$1")
+        .replace(/^[#>*\-+]\s*/gm, "")
+        .replace(/`{1,3}/g, "")
+        .replace(/\*{1,3}|_{1,3}/g, "");
+      const contentLines = pdf.splitTextToSize(plainText || " ", contentWidth);
+      const lineHeight = 6;
+      let pageNumber = 1;
+
+      contentLines.forEach((line) => {
+        if (cursorY + lineHeight > footerTop - 9) {
+          addFooter(pageNumber);
+          pdf.addPage();
+          pageNumber += 1;
+          cursorY = 24;
+        }
+        pdf.text(line, margin, cursorY);
+        cursorY += lineHeight;
+      });
+
+      addFooter(pageNumber);
+      pdf.save(`${sanitizeFilename(title || "Untitled Note")}.pdf`);
     } catch (err) {
-      console.error(
-        "PDF export error:",
-        err
-      );
-
-      alert(
-        "Unable to export the manuscript as PDF."
-      );
-    } finally {
-      document.body.removeChild(
-        pdfContainer
-      );
+      console.error("PDF export error:", err);
+      setPdfError(true);
     }
-  };
-
-  const escapeHtml = (value = "") => {
-    return String(value)
-      .replace(
-        /&/g,
-        "&amp;"
-      )
-      .replace(
-        /</g,
-        "&lt;"
-      )
-      .replace(
-        />/g,
-        "&gt;"
-      )
-      .replace(
-        /"/g,
-        "&quot;"
-      )
-      .replace(
-        /'/g,
-        "&#039;"
-      );
   };
 
   const sanitizeFilename = (
@@ -825,7 +705,7 @@ export default function Editor({
         />
 
         <p className="text-xl italic">
-          Select a manuscript or
+          Select an article or
           folder to begin editing.
         </p>
       </div>
@@ -847,25 +727,25 @@ export default function Editor({
       {/* -------------------------------------------------- */}
 
       <div
-        className={`flex items-center justify-between border-b ${colors.border} px-6 py-3 ${colors.toolbar}`}
+        className={`flex items-center justify-between gap-3 border-b ${colors.border} px-6 py-3 max-md:px-3 ${colors.toolbar}`}
       >
-        <div className="flex items-center gap-2 text-sm text-neutral-600">
-          <span className="font-serif italic font-medium">
-            Scribe
+        <div className="flex items-center gap-2 text-xs font-sans text-neutral-500">
+          <span className="font-medium">
+            ArchiWiki
           </span>
 
           <span>&gt;</span>
 
-          <span className="font-semibold">
+          <span className="font-medium text-neutral-700">
             {note.title ||
               "Untitled"}
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           {/* Font size */}
 
-          <div className="flex items-center gap-2 text-xs">
+          <div className="hidden sm:flex items-center gap-2 text-xs">
             <span>Size:</span>
 
             <input
@@ -905,70 +785,37 @@ export default function Editor({
 
             {/* Edit / Save */}
 
-            {lockStatus.success ? (
-              <button
-                onClick={async () => {
-                  if (isEditing) {
-                    await onSaveNote(
-                      note.id,
-                      title,
-                      body
-                    );
-                  }
+  <button
+    onClick={async () => {
+      if (isEditing) {
+        await onSaveNote(
+          note.id,
+          title,
+          body
+        );
 
-                  setIsEditing(
-                    !isEditing
-                  );
-                }}
-                className="py-1 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
-              >
-                {isEditing ? (
-                  <>
-                    <Save size={12} />
-                    Save
-                  </>
-                ) : (
-                  <>
-                    <Edit size={12} />
-                    Edit
-                  </>
-                )}
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-neutral-200 text-neutral-700 rounded text-xs font-semibold">
-                <AlertTriangle
-                  size={12}
-                />
-                Read-Only
-              </div>
-            )}
+        setIsEditing(false);
+      } else {
+        enterEditMode();
+      }
+    }}
+    className="py-1 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+  >
+    {isEditing ? (
+      <>
+        <Save size={12} />
+        Save
+      </>
+    ) : (
+      <>
+        <Edit size={12} />
+        Edit
+      </>
+    )}
+  </button>
           </div>
         </div>
       </div>
-
-      {/* -------------------------------------------------- */}
-      {/* LOCK NOTIFICATION                                  */}
-      {/* -------------------------------------------------- */}
-
-      {!lockStatus.success && (
-        <div
-          className={`${colors.notification} ${colors.notificationText} text-xs px-6 py-2 border-b ${colors.border} flex items-center gap-2`}
-        >
-          <AlertTriangle
-            size={14}
-          />
-
-          <span>
-            This manuscript is
-            currently being written
-            on another active device
-            by user [
-            {lockStatus.lockedBy}
-            ]. Access is temporarily
-            restricted to Read Only.
-          </span>
-        </div>
-      )}
 
       {/* -------------------------------------------------- */}
       {/* WORKING DESK                                       */}
@@ -980,7 +827,7 @@ export default function Editor({
         {/* ------------------------------------------------ */}
 
         <div
-          className="flex-1 flex flex-col p-8 overflow-y-auto"
+          className="flex-1 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto"
           style={{
             fontSize: `${fontSize}px`
           }}
@@ -1186,7 +1033,7 @@ export default function Editor({
 
             <div
               id="print-container"
-              className="flex-1 prose max-w-2xl mx-auto font-serif leading-loose"
+              className="flex-1 prose max-w-4xl mr-auto font-serif leading-loose text-left"
               onClick={
                 handleHtmlClick
               }
@@ -1218,7 +1065,7 @@ export default function Editor({
         {/* -------------------------------------------------- */}
 
         <div
-          className={`w-56 border-l ${colors.border} ${colors.sidebar} p-4 flex flex-col gap-4 text-xs font-sans`}
+          className={`w-56 border-l ${colors.border} ${colors.sidebar} p-4 flex flex-col gap-4 text-xs font-sans max-lg:hidden`}
         >
           <h4 className="font-bold uppercase tracking-wider text-neutral-500 text-[10px]">
             Backlinks ({backlinks.length})
@@ -1315,6 +1162,18 @@ export default function Editor({
           </span>
         </div>
       </div>
+
+      {pdfError && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="pdf-error-title">
+          <div className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme}`}>
+            <h2 id="pdf-error-title" className="text-base font-semibold">PDF export failed</h2>
+            <p className="mt-2 text-sm text-neutral-500">The PDF could not be created. Please try again.</p>
+            <div className="mt-5 flex justify-end">
+              <button type="button" onClick={() => setPdfError(false)} className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
