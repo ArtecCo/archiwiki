@@ -136,6 +136,11 @@ useEffect(() => {
 
     if (noteId) {
       setActiveNoteId(noteId);
+      setNewNoteId(null);
+      setActiveTab("editor");
+    } else {
+      setActiveNoteId(null);
+      setNewNoteId(null);
       setActiveTab("editor");
     }
   };
@@ -310,6 +315,18 @@ const handleCreateNote = async (folderId = null) => {
     return fold ? `${getFolderPath(fold.parentId)}/${fold.name}` : "Root";
   };
 
+  const handleCloseNote = () => {
+  setNewNoteId(null);
+  setActiveNoteId(null);
+  setActiveTab("editor");
+
+  window.history.pushState(
+    {},
+    "",
+    window.location.pathname
+  );
+};
+
   // Theme variable styles helper
   const getThemeClasses = () => {
     switch(theme) {
@@ -358,6 +375,28 @@ const handleCreateNote = async (folderId = null) => {
   };
 
   const shellTheme = getShellThemeClasses();
+
+  const articleCount = decryptedNotes.length;
+
+const folderCount = folders.filter(
+  (folder) => !folder.parentId
+).length;
+
+const subfolderCount = folders.filter(
+  (folder) => !!folder.parentId
+).length;
+
+const writingSince = user?.metadata?.creationTime
+  ? new Date(user.metadata.creationTime)
+  : null;
+
+const formattedWritingSince = writingSince
+  ? `${String(writingSince.getDate()).padStart(2, "0")}-${String(
+      writingSince.getMonth() + 1
+    ).padStart(2, "0")}-${writingSince.getFullYear()}`
+  : "";
+
+
   const requiresUnlock = Boolean(user && !masterKey);
   const dialogTheme = {
     beige: {
@@ -600,10 +639,15 @@ const handleCreateNote = async (folderId = null) => {
   theme={theme}
   newNoteId={newNoteId}
   note={decryptedNotes.find(n => n.id === activeNoteId)}
+  articleCount={articleCount}
+  folderCount={folderCount}
+  subfolderCount={subfolderCount}
+  writingSince={formattedWritingSince}
   onSaveNote={handleSaveNote}
   notesPool={decryptedNotes}
   fontSize={fontSize}
   setFontSize={setFontSize}
+  onCloseNote={handleCloseNote}
   onNavigateToNote={(id) => {
   setNewNoteId(null);
   setActiveNoteId(id);
