@@ -1,9 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { 
   getFirestore, 
-  enableIndexedDbPersistence, 
-  doc, 
-  runTransaction 
+  enableIndexedDbPersistence 
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
@@ -35,51 +33,5 @@ enableIndexedDbPersistence(db).catch((err) => {
     console.warn("The current browser does not support offline persistence.");
   }
 });
-
-/**
- * Acquire an active editing lock on a document.
- * Prevents multi-device concurrent editing collisions.
- */
-export const acquireLock = async (noteId, userId, sessionToken) => {
-  const lockRef = doc(db, "locks", noteId);
-  const now = Date.now();
-  const lockDuration = 5 * 60 * 1000; // 5 minutes validity
-
-  return runTransaction(db, async (transaction) => {
-    const lockSnap = await transaction.get(lockRef);
-    if (lockSnap.exists()) {
-      const lockData = lockSnap.data();
-      // If lock is still valid, not expired, and held by someone else (different session)
-      if (lockData.expiresAt > now && lockData.sessionToken !== sessionToken) {
-        return { success: false, lockedBy: lockData.userId };
-      }
-    }
-    // Acquire or renew lock
-    transaction.set(lockRef, {
-      userId,
-      sessionToken,
-      expiresAt: now + lockDuration,
-      updatedAt: now
-    });
-    return { success: true };
-  });
-};
-
-/**
- * Cleanly release lock on note when closing or moving away
- */
-export const releaseLock = async (noteId, sessionToken) => {
-  const lockRef = doc(db, "locks", noteId);
-  try {
-    await runTransaction(db, async (transaction) => {
-      const lockSnap = await transaction.get(lockRef);
-      if (lockSnap.exists() && lockSnap.data().sessionToken === sessionToken) {
-        transaction.delete(lockRef);
-      }
-    });
-  } catch (err) {
-    console.error("Error releasing lock:", err);
-  }
-};
 
 export { db, auth };
