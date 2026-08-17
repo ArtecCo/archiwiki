@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="ArchiWiki" />
 
     <!-- Favicon and Touch Icons -->
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/A.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     
     <!-- Google Font Web Integration -->
@@ -26,13 +26,137 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400..700&display=swap" rel="stylesheet">
     
     <!-- Web App Manifest Link (handled dynamically by vite-plugin-pwa) -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/manifest.json" />
   </head>
-  <body class="bg-[#F5F2EB] text-[#202122] antialiased select-none">
-    <!-- Main Mount Target for React App -->
-    <div id="root"></div>
+  <body>
+  <script>
+    (function () {
+      const theme =
+        localStorage.getItem("archiwiki-theme") || "beige";
 
-    <!-- Vite's SPA Script Entry Pointer -->
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+      const themes = {
+        beige: {
+          background: "#F5F2EB",
+          foreground: "#3F372B",
+          muted: "#8A8176"
+        },
+        wikipedia: {
+          background: "#F8F9FA",
+          foreground: "#202122",
+          muted: "#72777D"
+        },
+        charcoal: {
+          background: "#171717",
+          foreground: "#F5F5F5",
+          muted: "#A3A3A3"
+        }
+      };
+
+      const selected =
+        themes[theme] || themes.beige;
+
+      document.documentElement.style.backgroundColor =
+        selected.background;
+
+      document.body.style.backgroundColor =
+        selected.background;
+
+      document.body.innerHTML = `
+        <div
+          id="archiwiki-loader"
+          style="
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: ${selected.background};
+            color: ${selected.foreground};
+            font-family: Georgia, 'Times New Roman', serif;
+            transition:
+              opacity 420ms ease,
+              visibility 420ms ease;
+          "
+        >
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              text-align: center;
+            "
+          >
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                border: 1px solid ${selected.foreground};
+                transform: rotate(45deg);
+                margin-bottom: 24px;
+                opacity: 0.8;
+                animation: archiwikiLoaderPulse 1.5s ease-in-out infinite;
+              "
+            ></div>
+
+            <div
+  style="
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+  "
+>
+  ArchiWiki
+</div>
+
+            <div
+              style="
+                width: 42px;
+                height: 1px;
+                margin-top: 14px;
+                background: ${selected.muted};
+                opacity: 0.55;
+                animation: archiwikiLoaderLine 1.5s ease-in-out infinite;
+              "
+            ></div>
+          </div>
+        </div>
+
+        <style>
+          @keyframes archiwikiLoaderPulse {
+            0%, 100% {
+              transform: rotate(45deg) scale(0.88);
+              opacity: 0.45;
+            }
+
+            50% {
+              transform: rotate(45deg) scale(1);
+              opacity: 0.9;
+            }
+          }
+
+          @keyframes archiwikiLoaderLine {
+            0%, 100% {
+              transform: scaleX(0.55);
+              opacity: 0.3;
+            }
+
+            50% {
+              transform: scaleX(1);
+              opacity: 0.7;
+            }
+          }
+        </style>
+      `;
+
+      window.__ARCHIWIKI_LOADER_READY__ = true;
+    })();
+  </script>
+
+  <div id="root"></div>
+
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 </html>
