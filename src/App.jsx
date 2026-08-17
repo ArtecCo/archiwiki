@@ -40,7 +40,14 @@ export default function App() {
 }, []);
 
 
-  const { user, masterKey, login, registerWithInvite, logout } = useAuth();
+const {
+  user,
+  masterKey,
+  login,
+  unlock,
+  registerWithInvite,
+  logout
+} = useAuth();
   
   // Auth Form parameters
   const [isRegistering, setIsRegistering] = useState(false);
@@ -190,7 +197,12 @@ const handleAuthSubmit = async (e) => {
   setError("");
 
   try {
-    if (isRegistering) {
+    if (requiresUnlock) {
+      // Firebase user is already authenticated.
+      // Verify the same account password and rebuild
+      // the encryption key.
+      await unlock(password);
+    } else if (isRegistering) {
       await registerWithInvite(
         email,
         password,
@@ -203,13 +215,20 @@ const handleAuthSubmit = async (e) => {
       );
     }
   } catch (err) {
-    console.error("Authentication error:", err);
+    console.error(
+      "Authentication error:",
+      err
+    );
 
     setError(
-      err?.message || "Authentication failed. Please try again."
+      err?.code === "auth/wrong-password" ||
+      err?.code === "auth/invalid-credential"
+        ? "Incorrect password."
+        : err?.message ||
+          "Authentication failed. Please try again."
     );
   } finally {
-    // Never retain authentication credentials in React state
+    // Never retain authentication credentials in React state.
     setEmail("");
     setPassword("");
   }
@@ -559,6 +578,16 @@ const formattedWritingSince = writingSince
               {requiresUnlock ? "Unlock Notes" : isRegistering ? "Register Account" : "Access Your Encrypted Articles"}
             </button>
           </form>
+
+          {requiresUnlock && (
+  <button
+    type="button"
+    onClick={handleLogout}
+    className="w-full mt-3 py-2 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
+  >
+    Log out
+  </button>
+)}
 
           {!requiresUnlock && <div className="mt-6 pt-4 border-t border-neutral-200 text-center">
             <button 
