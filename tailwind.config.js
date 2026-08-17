@@ -21,8 +21,8 @@ export default {
         }
       },
       fontFamily: {
-        serif: ['Georgia', 'Times New Roman', 'serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Montserrat', 'system-ui', 'sans-serif'],
+        archi: ['Cinzel', 'serif']
       }
     },
   },
