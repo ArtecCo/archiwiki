@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+*{
+  user-select: none;
+}
+
 html,
 body,
 #root {
@@ -10,5 +14,5 @@ body,
 }
 
 body {
-  font-family: Inter, system-ui, sans-serif;
+  font-family: "Montserrat", system-ui, sans-serif;
 }
