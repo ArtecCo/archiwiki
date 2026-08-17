@@ -8,6 +8,7 @@ import {
   BookOpen,
   Download,
   FileText,
+    X,
   Bold,
   Italic,
   Heading,
@@ -26,6 +27,11 @@ export default function Editor({
   fontSize,
   setFontSize,
   onNavigateToNote,
+  onCloseNote,
+  articleCount = 0,
+  folderCount = 0,
+  subfolderCount = 0,
+  writingSince = "",
   theme = "beige"
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -695,22 +701,85 @@ const enterEditMode = () => {
    */
 
   if (!note) {
-    return (
-      <div
-        className={`flex-1 flex flex-col items-center justify-center ${colors.page} font-serif p-12`}
-      >
+  return (
+    <div
+      className={`flex-1 flex flex-col items-center justify-center ${colors.page} font-serif px-6 py-12`}
+    >
+      <div className="w-full max-w-2xl text-center">
+
+        {/* Welcome */}
         <BookOpen
-          size={48}
-          className="stroke-1 text-neutral-400 mb-4"
+          size={34}
+          strokeWidth={1}
+          className="mx-auto mb-6 text-neutral-400"
         />
 
-        <p className="text-xl italic">
-          Select an article or
-          folder to begin editing.
+        <h1 className="text-3xl md:text-4xl font-medium tracking-wide mb-3">
+          Welcome to ArchiWiki
+        </h1>
+
+        <p
+          className={`text-sm md:text-base italic leading-relaxed max-w-md mx-auto ${colors.muted}`}
+        >
+          A quiet place to write, organise, and preserve the
+          things worth remembering.
         </p>
+
+        {/* Metrics */}
+        <div className="mt-12 flex items-center justify-center">
+          <div className="flex items-center">
+
+            {/* Articles */}
+            <div className="px-6 md:px-10 text-center">
+              <div className="text-2xl md:text-3xl font-medium">
+                {articleCount}
+              </div>
+
+              <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+                Articles
+              </div>
+            </div>
+
+            <div className={`h-10 w-px ${colors.border}`} />
+
+            {/* Folders */}
+            <div className="px-6 md:px-10 text-center">
+              <div className="text-2xl md:text-3xl font-medium">
+                {folderCount}
+              </div>
+
+              <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+                Folders
+              </div>
+            </div>
+
+            <div className={`h-10 w-px ${colors.border}`} />
+
+            {/* Subfolders */}
+            <div className="px-6 md:px-10 text-center">
+              <div className="text-2xl md:text-3xl font-medium">
+                {subfolderCount}
+              </div>
+
+              <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+                Subfolders
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Writing since */}
+        {writingSince && (
+          <p className="mt-10 text-[10px] uppercase tracking-[0.2em] text-neutral-400">
+            Writing since {writingSince}
+          </p>
+        )}
+
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   /*
    * ---------------------------------------------------------
@@ -813,6 +882,15 @@ const enterEditMode = () => {
       </>
     )}
   </button>
+  <button
+  type="button"
+  onClick={onCloseNote}
+  title="Close article"
+  aria-label="Close article"
+  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-500 hover:text-neutral-800 transition-colors`}
+>
+  <X size={16} />
+</button>
           </div>
         </div>
       </div>
