@@ -4,7 +4,9 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  onAuthStateChanged
+  onAuthStateChanged,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from "firebase/auth";
 
 import {
@@ -123,6 +125,52 @@ export const AuthProvider = ({ children }) => {
     return loggedUser;
   };
 
+  const unlock = async (password) => {
+  if (!user) {
+    throw new Error(
+      "Your session has expired. Please log in again."
+    );
+  }
+
+  /*
+   * Verify the SAME Firebase account password
+   * without signing the user out or replacing
+   * the current Firebase session.
+   */
+  const credential =
+    EmailAuthProvider.credential(
+      user.email,
+      password
+    );
+
+  await reauthenticateWithCredential(
+    user,
+    credential
+  );
+
+  /*
+   * The password is correct.
+   * Derive the exact same encryption key
+   * used when the account was created/logged in.
+   */
+  const derived =
+    deriveMasterKey(
+      password,
+      user.uid
+    );
+
+  sessionStorage.setItem(
+    "scribe_session_aes_key",
+    derived
+  );
+
+  setMasterKey(derived);
+
+  return user;
+};
+
+
+
   const logout = async () => {
     await signOut(auth);
     clearLocalKey();
@@ -140,6 +188,7 @@ export const AuthProvider = ({ children }) => {
         masterKey,
         registerWithInvite,
         login,
+        unlock,
         logout,
         resetPassword
       }}
