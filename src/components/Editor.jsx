@@ -6,12 +6,57 @@ import { acquireLock, releaseLock } from "../firebase";
 export default function Editor({
   note,
   onSaveNote,
-  notesPool, // All decrypted notes in the system for wiki-link detection
+  notesPool,
   userId,
   fontSize,
   setFontSize,
-  onNavigateToNote
+  onNavigateToNote,
+  theme
 }) {
+    const isDark = theme === "charcoal";
+
+  const themeStyles = {
+    beige: {
+      page: "bg-[#F5F2EB] text-neutral-800",
+      header: "bg-[#EEEAE1] border-neutral-300 text-neutral-700",
+      workspace: "bg-[#F5F2EB]",
+      panel: "bg-[#EEEAE1] border-neutral-300",
+      card: "bg-white border-neutral-200",
+      input: "text-neutral-800 placeholder-neutral-400",
+      muted: "text-neutral-500",
+      border: "border-neutral-300",
+      popup: "bg-white border-neutral-300 text-neutral-800",
+      hover: "hover:bg-neutral-100"
+    },
+
+    wikipedia: {
+      page: "bg-[#F8F9FA] text-[#202122]",
+      header: "bg-[#EAECF0] border-[#A2A9B1] text-[#202122]",
+      workspace: "bg-[#F8F9FA]",
+      panel: "bg-[#EAECF0] border-[#A2A9B1]",
+      card: "bg-white border-[#A2A9B1]",
+      input: "text-[#202122] placeholder-[#72777D]",
+      muted: "text-[#54595D]",
+      border: "border-[#A2A9B1]",
+      popup: "bg-white border-[#A2A9B1] text-[#202122]",
+      hover: "hover:bg-[#EAECF0]"
+    },
+
+    charcoal: {
+      page: "bg-[#121212] text-neutral-100",
+      header: "bg-[#1F1F1F] border-neutral-700 text-neutral-200",
+      workspace: "bg-[#121212]",
+      panel: "bg-[#1F1F1F] border-neutral-700",
+      card: "bg-[#181818] border-neutral-700",
+      input: "text-neutral-100 placeholder-neutral-600",
+      muted: "text-neutral-400",
+      border: "border-neutral-700",
+      popup: "bg-[#1F1F1F] border-neutral-700 text-neutral-100",
+      hover: "hover:bg-neutral-800"
+    }
+  };
+
+  const colors = themeStyles[theme] || themeStyles.beige;
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -180,10 +225,10 @@ export default function Editor({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#F5F2EB] text-[#202122]">
+    <div className={`flex-1 flex flex-col h-full ${colors.page}`}>
       {/* Editor Context Menu */}
-      <div className="flex items-center justify-between border-b border-neutral-300 px-6 py-3 bg-neutral-100/50">
-        <div className="flex items-center gap-2 text-sm text-neutral-600">
+      <div className={`flex items-center justify-between border-b px-6 py-3 ${colors.header}`}>
+        <div className={`flex items-center gap-2 text-sm ${colors.muted}`}>
           <span className="font-serif italic font-medium">Scribe</span>
           <span>&gt;</span>
           <span className="font-semibold">{note.title || "Untitled"}</span>
@@ -245,7 +290,10 @@ export default function Editor({
       {/* Working Desk layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Main Workspace Frame */}
-        <div className="flex-1 flex flex-col p-8 overflow-y-auto" style={{ fontSize: `${fontSize}px` }}>
+        <div
+  className={`flex-1 flex flex-col p-8 overflow-y-auto ${colors.workspace}`}
+  style={{ fontSize: `${fontSize}px` }}
+>
           {isEditing ? (
             <div className="flex-1 flex flex-col gap-4 relative">
               <input
@@ -253,7 +301,7 @@ export default function Editor({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Title your note"
-                className="w-full bg-transparent border-b border-neutral-300 pb-2 focus:outline-none focus:border-neutral-800 font-serif font-bold text-2xl tracking-wide placeholder-neutral-300"
+                className={`w-full bg-transparent border-b ${colors.border} pb-2 focus:outline-none focus:border-neutral-500 font-serif font-bold text-2xl tracking-wide ${colors.input}`}
               />
               <textarea
                 ref={textareaRef}
@@ -261,7 +309,7 @@ export default function Editor({
                 onChange={handleTextareaChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Write your thoughts... Type '[[' to link pages."
-                className="flex-1 w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed text-neutral-800"
+                className={`flex-1 w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed ${colors.input}`}
               />
 
               {/* Wiki-link autocomplete dropdown list */}
