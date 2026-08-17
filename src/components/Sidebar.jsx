@@ -10,6 +10,31 @@ import {
   Search
 } from "lucide-react";
 
+const sidebarAnimationStyles = `
+  @keyframes archiwikiSidebarItemIn {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .archiwiki-sidebar-item {
+    animation: archiwikiSidebarItemIn 280ms ease-out both;
+    animation-delay: var(--archiwiki-delay, 0ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .archiwiki-sidebar-item {
+      animation: none;
+    }
+  }
+`;
+
 export default function Sidebar({
   theme = "beige",
   folders,
@@ -81,28 +106,12 @@ export default function Sidebar({
   const colors = themeClasses[theme] || themeClasses.beige;
 
 
-  // const toggleFolder = (id) => {
-  //   setExpandedFolders((prev) => ({
-  //     ...prev,
-  //     [id]: !prev[id]
-  //   }));
-  // };
-
   const toggleFolder = (id) => {
   setExpandedFolders((prev) => {
     const next = {
       ...prev,
       [id]: !prev[id]
     };
-
-    console.log(
-      "[ArchiWiki] Folder toggle:",
-      id,
-      "expanded:",
-      next[id],
-      "state:",
-      next
-    );
 
     return next;
   });
@@ -180,7 +189,11 @@ export default function Sidebar({
   // Recursive Folder Renderer
   // -----------------------------
 
-  const renderFolderNode = (folderId, level = 0) => {
+  const renderFolderNode = (
+  folderId,
+  level = 0,
+  itemIndex = 0
+) => {
     const currentFolder = folders.find(
       (f) => f.id === folderId
     );
@@ -199,18 +212,22 @@ export default function Sidebar({
 
     return (
       <div
-        key={folderId}
-        style={{
-          paddingLeft: `${level * 8}px`
-        }}
-        className="select-none"
+  key={folderId}
+  style={{
+  paddingLeft: `${level * 8}px`,
+  "--archiwiki-delay": `${Math.min(
+    itemIndex * 35,
+    175
+  )}ms`
+}}
+  className="select-none"
         onDragOver={handleDragOver}
         onDrop={(e) => handleDrop(e, folderId)}
       >
         {/* Folder Header */}
 
         <div
-          className={`group flex items-center justify-between py-1 px-2 ${colors.itemHover} rounded cursor-pointer border border-transparent`}
+          className={`archiwiki-sidebar-item group flex items-center justify-between py-1 px-2 ${colors.itemHover} rounded cursor-pointer border border-transparent`}
           onClick={() => toggleFolder(folderId)}
           onContextMenu={(e) =>
             showContextMenu(e, folderId)
@@ -265,16 +282,28 @@ export default function Sidebar({
 
         {isExpanded && (
           <div className={`border-l ${colors.divider} ml-3.5 my-0.5`}>
-            {childFolders.map((child) =>
-              renderFolderNode(
-                child.id,
-                level + 1
-              )
-            )}
+            {childFolders.map((child, index) =>
+  renderFolderNode(
+    child.id,
+    level + 1,
+    index
+  )
+)}
 
-            {childNotes.map((note) => (
-              <div
-                key={note.id}
+            {childNotes.map((note, index) => (
+  <div
+    key={note.id}
+    style={{
+      "--archiwiki-delay": `${Math.min(
+        index * 35,
+        175
+      )}ms`
+    }}
+    className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ml-2 ${colors.itemHover} rounded cursor-pointer text-sm ${
+      activeNoteId === note.id
+        ? colors.activeItem
+        : colors.idleItem
+    }`}
                 draggable
                 onDragStart={(e) =>
                   handleDragStart(
@@ -286,11 +315,6 @@ export default function Sidebar({
                 onClick={() =>
                   onSelectNote(note.id)
                 }
-                className={`group flex items-center justify-between gap-2 py-1 px-3 ml-2 ${colors.itemHover} rounded cursor-pointer text-sm ${
-                  activeNoteId === note.id
-                    ? colors.activeItem
-                    : colors.idleItem
-                }`}
               >
                 <div className="flex items-center gap-1.5 truncate min-w-0">
                   <FileText
@@ -354,6 +378,8 @@ const filteredFolders = folders.filter((folder) =>
   // -----------------------------
 
   return (
+    <>
+    <style>{sidebarAnimationStyles}</style>
     <div
       className={`w-64 h-full flex flex-col border-r select-none ${colors.shell}`}
       onClick={closeContextMenu}
@@ -426,15 +452,21 @@ const filteredFolders = folders.filter((folder) =>
           Files
         </h4>
 
-        {filteredNotes.map((note) => (
-          <div
-            key={note.id}
+        {filteredNotes.map((note, index) => (
+  <div
+    key={note.id}
+    style={{
+      "--archiwiki-delay": `${Math.min(
+        index * 35,
+        175
+      )}ms`
+    }}
+    className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
+      activeNoteId === note.id
+        ? colors.activeItem
+        : colors.idleItem
+    }`}
             onClick={() => onSelectNote(note.id)}
-            className={`group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
-              activeNoteId === note.id
-                ? colors.activeItem
-                : colors.idleItem
-            }`}
           >
             <div className="flex items-center gap-1.5 truncate min-w-0">
               <FileText
@@ -475,16 +507,22 @@ const filteredFolders = folders.filter((folder) =>
           Folders
         </h4>
 
-        {filteredFolders.map((folder) => (
-          <div
-            key={folder.id}
-            onClick={() => {
-  setExpandedFolders((prev) => ({
-    ...prev,
-    [folder.id]: true
-  }));
-}}
-            className={`flex items-center gap-1.5 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${colors.folderText}`}
+        {filteredFolders.map((folder, index) => (
+  <div
+    key={folder.id}
+    style={{
+      "--archiwiki-delay": `${Math.min(
+        index * 35,
+        175
+      )}ms`
+    }}
+    onClick={() => {
+      setExpandedFolders((prev) => ({
+        ...prev,
+        [folder.id]: true
+      }));
+    }}
+    className={`archiwiki-sidebar-item flex items-center gap-1.5 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${colors.folderText}`}
           >
             <Folder
               size={13}
@@ -521,8 +559,14 @@ const filteredFolders = folders.filter((folder) =>
                   Unsorted Notes
                 </h3>
 
-                {rootNotes.map((note) => (
+                {rootNotes.map((note, index) => (
                   <div
+                  style={{
+  "--archiwiki-delay": `${Math.min(
+    index * 35,
+    175
+  )}ms`
+}}
                     key={note.id}
                     draggable
                     onDragStart={(e) =>
@@ -535,7 +579,7 @@ const filteredFolders = folders.filter((folder) =>
                     onClick={() =>
                       onSelectNote(note.id)
                     }
-                    className={`group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
+                    className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${
                       activeNoteId === note.id
                         ? colors.activeItem
                         : colors.idleItem
@@ -631,5 +675,6 @@ const filteredFolders = folders.filter((folder) =>
         </div>
       )}
     </div>
+    </>
   );
 }
