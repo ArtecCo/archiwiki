@@ -1,18 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { 
+import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged
 } from "firebase/auth";
-import { 
-  doc, 
-  getDoc, 
-  updateDoc, 
-  collection, 
-  getDocs 
+
+import {
+  doc,
+  getDoc,
+  updateDoc
 } from "firebase/firestore";
+
 import { auth, db } from "../firebase";
 import { deriveMasterKey } from "../crypto";
 
@@ -21,6 +21,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const [masterKey, setMasterKey] = useState(() => {
     return sessionStorage.getItem("scribe_session_aes_key") || null;
   });
@@ -28,11 +29,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+
       if (!currentUser) {
         clearLocalKey();
       }
+
       setLoading(false);
     });
+
     return unsubscribe;
   }, []);
 
@@ -41,11 +45,20 @@ export const AuthProvider = ({ children }) => {
     setMasterKey(null);
   };
 
-  /**
-   * Registers a new user only if a valid, unused registration invite token is passed.
+  /*
+   * The Firebase login password is now also used
+   * to derive the local AES-256 encryption key.
+   *
+   * The password itself is NEVER stored in Firestore
+   * or sessionStorage.
    */
-  const registerWithInvite = async (email, password, inviteToken, masterPassword) => {
-    // 1. Validate invite token exists and is active
+
+  const registerWithInvite = async (
+    email,
+    password,
+    inviteToken
+  ) => {
+    // 1. Validate invite token
     const inviteRef = doc(db, "pendingInvites", inviteToken);
     const inviteSnap = await getDoc(inviteRef);
 
@@ -53,37 +66,60 @@ export const AuthProvider = ({ children }) => {
       throw new Error("Invalid or already exhausted invite token.");
     }
 
-    // 2. Create the user
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // 2. Create Firebase account
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
     const newUser = userCredential.user;
 
-    // 3. Set the invite token to used
+    // 3. Mark invite as used
     await updateDoc(inviteRef, {
       used: true,
       usedBy: newUser.email,
       usedAt: Date.now()
     });
 
-    // 4. Derive and set the client master password key locally
-    const derived = deriveMasterKey(masterPassword, newUser.uid);
-    sessionStorage.setItem("scribe_session_aes_key", derived);
+    // 4. Derive local encryption key from LOGIN PASSWORD
+    const derived = deriveMasterKey(password, newUser.uid);
+
+    sessionStorage.setItem(
+      "scribe_session_aes_key",
+      derived
+    );
+
     setMasterKey(derived);
 
     return newUser;
   };
 
-  /**
-   * Classic Sign-In with an additional prompt requirement for the local decryption key
+  /*
+   * Login password is also the encryption password.
    */
-  const login = async (email, password, masterPassword) => {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  const login = async (email, password) => {
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
     const loggedUser = userCredential.user;
-    
-    // Derive and set the Master AES Key locally
-    const derived = deriveMasterKey(masterPassword, loggedUser.uid);
-    sessionStorage.setItem("scribe_session_aes_key", derived);
+
+    // Derive encryption key from the same login password
+    const derived = deriveMasterKey(
+      password,
+      loggedUser.uid
+    );
+
+    sessionStorage.setItem(
+      "scribe_session_aes_key",
+      derived
+    );
+
     setMasterKey(derived);
-    
+
     return loggedUser;
   };
 
@@ -97,15 +133,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      masterKey,
-      registerWithInvite,
-      login,
-      logout,
-      resetPassword
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        masterKey,
+        registerWithInvite,
+        login,
+        logout,
+        resetPassword
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
