@@ -2371,7 +2371,11 @@ return (
         flex items-center justify-end
         gap-2
         mt-2
+        pt-2
+        border-t
         md:mt-0
+        md:pt-0
+        md:border-t-0
         shrink-0
       "
     >
