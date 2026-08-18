@@ -2820,74 +2820,66 @@ export default function Editor({
           </div>
         </div>
       </div>
+{/* -------------------------------------------------- */}
+{/* STATUS BAR                                         */}
+{/* -------------------------------------------------- */}
 
-      {/* -------------------------------------------------- */}
-      {/* STATUS BAR                                         */}
-      {/* -------------------------------------------------- */}
+<div
+  className={`shrink-0 border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
+>
+  <div className="w-full overflow-x-auto">
+    <div className="min-w-max px-6 py-3 md:px-6 md:py-1.5 flex items-center justify-between gap-8 whitespace-nowrap">
 
-      <div
-        className={`border-t ${colors.border} ${colors.status} px-6 py-1.5 flex justify-between items-center gap-4 text-[11px] font-sans text-neutral-500 overflow-hidden`}
-      >
-        <div className="min-w-0 flex gap-4 overflow-x-auto whitespace-nowrap">
-          <span>
-            Words:{" "}
-            <strong>
-              {words}
-            </strong>
-          </span>
+      <div className="flex gap-4">
+        <span>
+          Words:{" "}
+          <strong>{words}</strong>
+        </span>
 
-          <span>
-            Characters:{" "}
-            <strong>
-              {characters}
-            </strong>
-          </span>
+        <span>
+          Characters:{" "}
+          <strong>{characters}</strong>
+        </span>
 
-          <span>
-            Paragraphs:{" "}
-            <strong>
-              {paragraphs}
-            </strong>
-          </span>
+        <span>
+          Paragraphs:{" "}
+          <strong>{paragraphs}</strong>
+        </span>
 
-          <span>
-            Headings:{" "}
-            <strong>
-              {headings}
-            </strong>
-          </span>
+        <span>
+          Headings:{" "}
+          <strong>{headings}</strong>
+        </span>
 
-          <span>
-            Wiki Links:{" "}
-            <strong>
-              {wikiLinks}
-            </strong>
-          </span>
-        </div>
-
-        <div className="hidden sm:flex shrink-0 gap-4 whitespace-nowrap">
-          <span>
-            Updated:{" "}
-            <strong>
-              {updatedAtText}
-            </strong>
-          </span>
-
-          <span>
-            Status:{" "}
-            <strong
-              className={
-                theme ===
-                "charcoal"
-                  ? "text-neutral-100"
-                  : "text-neutral-700"
-              }
-            >
-              Encrypted AES-256
-            </strong>
-          </span>
-        </div>
+        <span>
+          Wiki Links:{" "}
+          <strong>{wikiLinks}</strong>
+        </span>
       </div>
+
+      <div className="flex gap-4">
+        <span>
+          Updated:{" "}
+          <strong>{updatedAtText}</strong>
+        </span>
+
+        <span>
+          Status:{" "}
+          <strong
+            className={
+              theme === "charcoal"
+                ? "text-neutral-100"
+                : "text-neutral-700"
+            }
+          >
+            Encrypted AES-256
+          </strong>
+        </span>
+      </div>
+
+    </div>
+  </div>
+</div>
 
       {pdfError && (
         <div
