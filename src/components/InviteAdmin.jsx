@@ -16,7 +16,6 @@ import {
   getDoc
 } from "firebase/firestore";
 
-
 import { auth, db } from "../firebase";
 
 const generateInviteCode = () => {
@@ -46,12 +45,24 @@ export default function InviteAdmin() {
   const [creating, setCreating] = useState(false);
 
   /*
-   * Watch Firebase authentication.
+   * Check whether the currently authenticated Firebase
+   * user exists in adminUsers/{uid} and is active.
+   *
+   * This deliberately checks auth.currentUser immediately
+   * instead of waiting indefinitely for the auth listener.
    */
   useEffect(() => {
-    return onAuthStateChanged(auth, async (currentUser) => {
+    let mounted = true;
+
+    const checkAdminAccess = async (currentUser) => {
+      if (!mounted) return;
+
       setUser(currentUser);
 
+      /*
+       * No authenticated Firebase user.
+       * Stop checking immediately and show login.
+       */
       if (!currentUser) {
         setAuthorized(false);
         setCheckingAccess(false);
@@ -65,23 +76,96 @@ export default function InviteAdmin() {
           currentUser.uid
         );
 
-        const adminSnap = await getDoc(adminRef);
+        /*
+         * Prevent the admin page from remaining on the
+         * loading screen forever if Firestore is unavailable.
+         */
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(
+              new Error(
+                "Administrator access check timed out."
+              )
+            );
+          }, 10000);
+        });
 
-        setAuthorized(
+        const adminSnap = await Promise.race([
+          getDoc(adminRef),
+          timeoutPromise
+        ]);
+
+        if (!mounted) return;
+
+        const isAdmin =
           adminSnap.exists() &&
-          adminSnap.data()?.active === true
-        );
+          adminSnap.data()?.active === true;
+
+        setAuthorized(isAdmin);
+
+        /*
+         * If the authenticated Firebase account exists
+         * but is not an active administrator, sign it out.
+         */
+        if (!isAdmin) {
+          await signOut(auth);
+
+          if (!mounted) return;
+
+          setUser(null);
+          setAuthorized(false);
+        }
       } catch (err) {
         console.error(
           "Failed to check admin access:",
           err
         );
 
-        setAuthorized(false);
-      }
+        if (!mounted) return;
 
-      setCheckingAccess(false);
-    });
+        setAuthorized(false);
+
+        if (
+          err?.message ===
+          "Administrator access check timed out."
+        ) {
+          setError(
+            "Unable to connect to Firebase. Please check your connection and try again."
+          );
+        } else {
+          setError(
+            "Unable to verify administrator access. Check your Firestore rules."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setCheckingAccess(false);
+        }
+      }
+    };
+
+    /*
+     * IMPORTANT:
+     * Check the current Firebase user immediately.
+     * This prevents the page from depending entirely
+     * on the auth-state callback firing before rendering.
+     */
+    checkAdminAccess(auth.currentUser);
+
+    /*
+     * Continue watching authentication changes.
+     */
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        checkAdminAccess(currentUser);
+      }
+    );
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   /*
@@ -121,6 +205,9 @@ export default function InviteAdmin() {
     );
   }, [authorized]);
 
+  /*
+   * Administrator login.
+   */
   const handleLogin = async (event) => {
     event.preventDefault();
 
@@ -131,12 +218,14 @@ export default function InviteAdmin() {
       const credential =
         await signInWithEmailAndPassword(
           auth,
-          email.trim(),
+          email.trim().toLowerCase(),
           password
         );
 
       /*
-       * Authorization is checked by the useEffect above.
+       * Verify the authenticated Firebase UID against:
+       *
+       * adminUsers/{uid}
        */
       const adminRef = doc(
         db,
@@ -146,16 +235,29 @@ export default function InviteAdmin() {
 
       const adminSnap = await getDoc(adminRef);
 
-      if (
-        !adminSnap.exists() ||
-        adminSnap.data()?.active !== true
-      ) {
+      const isAdmin =
+        adminSnap.exists() &&
+        adminSnap.data()?.active === true;
+
+      if (!isAdmin) {
         await signOut(auth);
+
+        setUser(null);
+        setAuthorized(false);
 
         throw new Error(
           "This account is not authorized as an administrator."
         );
       }
+
+      /*
+       * The auth listener will also see this user,
+       * but explicitly update state here so the UI
+       * does not have to wait for another auth event.
+       */
+      setUser(credential.user);
+      setAuthorized(true);
+      setCheckingAccess(false);
 
       setEmail("");
       setPassword("");
@@ -165,37 +267,63 @@ export default function InviteAdmin() {
         err
       );
 
-      setError(
-        err?.message ||
-        "Unable to sign in."
-      );
+      setAuthorized(false);
+      setCheckingAccess(false);
+
+      if (
+        err?.code === "auth/invalid-credential" ||
+        err?.code === "auth/wrong-password"
+      ) {
+        setError("Incorrect email or password.");
+      } else if (
+        err?.code === "auth/user-not-found"
+      ) {
+        setError("No account exists with this email.");
+      } else if (
+        err?.code === "auth/invalid-email"
+      ) {
+        setError("Please enter a valid email address.");
+      } else {
+        setError(
+          err?.message ||
+          "Unable to sign in."
+        );
+      }
     }
   };
 
+  /*
+   * Create a new single-use invitation.
+   */
   const createInvite = async () => {
     setError("");
     setMessage("");
     setCreating(true);
 
     try {
+      if (!user) {
+        throw new Error(
+          "You must be signed in as an administrator."
+        );
+      }
+
       const token = generateInviteCode();
 
       await setDoc(
-  doc(db, "pendingInvites", token),
-  {
-    token,
-    status: "available",
-    used: false,
-    claimId: null,
-    claimedAt: null,
-    usedBy: null,
-    usedEmail: null,
-    usedAt: null,
-    createdAt: serverTimestamp(),
-    createdBy: user.uid
-  }
-);
-
+        doc(db, "pendingInvites", token),
+        {
+          token,
+          status: "available",
+          used: false,
+          claimId: null,
+          claimedAt: null,
+          usedBy: null,
+          usedEmail: null,
+          usedAt: null,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid
+        }
+      );
 
       setMessage(
         `Invitation created: ${token}`
@@ -207,6 +335,7 @@ export default function InviteAdmin() {
       );
 
       setError(
+        err?.message ||
         "Unable to create invitation."
       );
     } finally {
@@ -214,6 +343,9 @@ export default function InviteAdmin() {
     }
   };
 
+  /*
+   * Copy invitation token.
+   */
   const copyInvite = async (token) => {
     try {
       await navigator.clipboard.writeText(token);
@@ -228,6 +360,9 @@ export default function InviteAdmin() {
     }
   };
 
+  /*
+   * Format Firestore timestamps.
+   */
   const formatDate = (value) => {
     if (!value) return "—";
 
@@ -239,6 +374,9 @@ export default function InviteAdmin() {
     return date.toLocaleString();
   };
 
+  /*
+   * Loading state.
+   */
   if (checkingAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB]">
@@ -249,6 +387,9 @@ export default function InviteAdmin() {
     );
   }
 
+  /*
+   * Login screen.
+   */
   if (!user || !authorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] p-6">
@@ -273,6 +414,7 @@ export default function InviteAdmin() {
               <input
                 type="email"
                 required
+                autoComplete="username"
                 value={email}
                 onChange={(e) =>
                   setEmail(e.target.value)
@@ -289,6 +431,7 @@ export default function InviteAdmin() {
               <input
                 type="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) =>
                   setPassword(e.target.value)
@@ -315,9 +458,13 @@ export default function InviteAdmin() {
     );
   }
 
+  /*
+   * Authorized administrator interface.
+   */
   return (
     <div className="min-h-screen bg-[#F5F2EB] text-neutral-900 p-6">
       <div className="max-w-5xl mx-auto">
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold">
@@ -330,7 +477,12 @@ export default function InviteAdmin() {
           </div>
 
           <button
-            onClick={() => signOut(auth)}
+            onClick={async () => {
+              await signOut(auth);
+              setUser(null);
+              setAuthorized(false);
+              setCheckingAccess(false);
+            }}
             className="text-xs text-neutral-500 hover:text-neutral-900"
           >
             Sign out
