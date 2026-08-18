@@ -1347,7 +1347,8 @@ if (!note) {
 
   return (
     <div
-      className={`flex-1 flex flex-col h-full ${colors.page}`}
+      {/* className={`flex-1 flex flex-col h-full ${colors.page}`} */}
+        className={`flex-1 min-h-0 flex flex-col h-full ${colors.page}`}
     >
       {/* -------------------------------------------------- */}
       {/* EDITOR CONTEXT MENU                                */}
@@ -1456,18 +1457,18 @@ if (!note) {
       {/* -------------------------------------------------- */}
       {/* WORKING DESK                                       */}
       {/* -------------------------------------------------- */}
+      <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
 
-      <div className="flex-1 flex overflow-hidden">
         {/* ------------------------------------------------ */}
         {/* MAIN WORKSPACE                                   */}
         {/* ------------------------------------------------ */}
 
         <div
-          className="flex-1 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto"
-          style={{
-            fontSize: `${fontSize}px`
-          }}
-        >
+  className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden"
+  style={{
+    fontSize: `${fontSize}px`
+  }}
+>
           {isEditing ? (
             <div className="flex-1 flex flex-col gap-4 relative">
 
@@ -1668,31 +1669,26 @@ if (!note) {
             /* ------------------------------------------------ */
 
             <div
-              id="print-container"
-              className="flex-1 overflow-y-auto"
-              onClick={
-                handleHtmlClick
-              }
-            >
-              <div className="prose max-w-4xl mr-auto font-serif leading-loose text-left">
+  id="print-container"
+  className="min-w-0 w-full"
+  onClick={handleHtmlClick}
+>
+  <div className="prose w-full max-w-4xl mr-auto font-serif leading-loose text-left break-words">
                 <h1 className="text-2xl font-bold border-b border-neutral-300 pb-3 mb-5 tracking-wide">
                   {title ||
                     "Untitled Note"}
                 </h1>
 
                 <div
-                  className={
-                    theme === "charcoal"
-                      ? "text-neutral-100"
-                      : "text-neutral-800"
-                  }
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      parseWikiLinks(
-                        body
-                      )
-                  }}
-                />
+  className={`min-w-0 max-w-full break-words ${
+    theme === "charcoal"
+      ? "text-neutral-100"
+      : "text-neutral-800"
+  }`}
+  dangerouslySetInnerHTML={{
+    __html: parseWikiLinks(body)
+  }}
+/>
               </div>
             </div>
           )}
