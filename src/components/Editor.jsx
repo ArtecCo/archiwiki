@@ -2820,8 +2820,13 @@ export default function Editor({
           </div>
         </div>
       </div>
+
+{/* -------------------------------------------------- */}
+        {/* Status bar                                    */}
+        {/* -------------------------------------------------- */}
+      
  <div
-        className={`border-t ${colors.border} ${colors.status} px-6 py-1.5 flex justify-between items-center text-[11px] font-sans text-neutral-500`}
+        className={`shrink-0 border-t ${colors.border} ${colors.status} px-6 py-1.5 flex justify-between items-center text-[11px] font-sans text-neutral-500`}
       >
         <div className="flex gap-4">
           <span>
