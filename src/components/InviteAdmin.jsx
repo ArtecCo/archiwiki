@@ -68,7 +68,8 @@ export default function InviteAdmin() {
   const [message, setMessage] = useState("");
 
   const [creating, setCreating] = useState(false);
-  const [loggingIn, setLoggingIn] = useState(false);
+const [loggingIn, setLoggingIn] = useState(false);
+const [newInviteToken, setNewInviteToken] = useState("");
 
 
   /*
@@ -376,9 +377,11 @@ export default function InviteAdmin() {
         }
       );
 
-      setMessage(
-        `Invitation created: ${token}`
-      );
+      setNewInviteToken(token);
+
+setMessage(
+  `Invitation created: ${token}`
+);
     } catch (err) {
       console.error(
         "Failed to create invitation:",
@@ -398,26 +401,126 @@ export default function InviteAdmin() {
   /*
    * Copy invitation.
    */
-  const copyInvite = async (token) => {
+  /*
+ * Build the shareable registration link for an invitation.
+ *
+ * Example:
+ * https://archithswiki.netlify.app/?invite=ABC123XYZ
+ */
+const getInviteLink = (token) => {
+  const normalizedToken = String(token || "").trim();
+
+  if (!normalizedToken) return "";
+
+  return `${window.location.origin}/?invite=${encodeURIComponent(
+    normalizedToken
+  )}`;
+};
+
+
+/*
+ * Copy the full registration link.
+ */
+const copyInviteLink = async (token) => {
+  const inviteLink = getInviteLink(token);
+
+  if (!inviteLink) {
+    setError("Unable to create the invitation link.");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(inviteLink);
+
+    setMessage("Invitation link copied.");
+    setError("");
+  } catch (err) {
+    console.error(
+      "Unable to copy invitation link:",
+      err
+    );
+
+    setError(
+      "Unable to copy the invitation link."
+    );
+  }
+};
+
+
+/*
+ * Share the full registration link.
+ *
+ * On phones/tablets and supported browsers this opens
+ * the native sharing menu.
+ *
+ * If Web Share is unavailable, fall back to copying
+ * the link to the clipboard.
+ */
+const shareInviteLink = async (token) => {
+  const inviteLink = getInviteLink(token);
+
+  if (!inviteLink) {
+    setError("Unable to create the invitation link.");
+    return;
+  }
+
+  const shareData = {
+    title: "ArchiWiki Invitation",
+    text: "You're invited to join ArchiWiki.",
+    url: inviteLink
+  };
+
+  try {
+    if (
+      navigator.share &&
+      typeof navigator.share === "function"
+    ) {
+      await navigator.share(shareData);
+
+      setMessage("Invitation link ready to share.");
+      setError("");
+      return;
+    }
+
+    // Desktop browsers that don't support Web Share:
+    await navigator.clipboard.writeText(inviteLink);
+
+    setMessage(
+      "Sharing isn't available here, so the invitation link was copied instead."
+    );
+    setError("");
+  } catch (err) {
+    // User closing/cancelling the native share dialog
+    // is not an application error.
+    if (err?.name === "AbortError") {
+      return;
+    }
+
+    console.error(
+      "Unable to share invitation link:",
+      err
+    );
+
+    // Final fallback to clipboard.
     try {
-      await navigator.clipboard.writeText(token);
+      await navigator.clipboard.writeText(inviteLink);
 
       setMessage(
-        `Copied ${token}`
+        "Unable to open sharing, so the invitation link was copied instead."
       );
-
       setError("");
-    } catch (err) {
+    } catch (copyError) {
       console.error(
-        "Unable to copy invitation:",
-        err
+        "Unable to copy invitation link:",
+        copyError
       );
 
       setError(
-        "Unable to copy the invitation."
+        "Unable to share or copy the invitation link."
       );
     }
-  };
+  }
+};
 
 
   /*
@@ -430,7 +533,7 @@ export default function InviteAdmin() {
       setUser(null);
       setAuthorized(false);
       setInvites([]);
-
+      setNewInviteToken("");
       setEmail("");
       setPassword("");
 
@@ -563,11 +666,51 @@ export default function InviteAdmin() {
             )}
 
 
-            {message && (
+            /* {message && (
               <p className="text-xs text-green-700">
                 {message}
               </p>
-            )}
+            )} */
+
+            {message && (
+  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+    <p className="text-xs text-green-700">
+      {message}
+    </p>
+
+    {newInviteToken && (
+      <div className="mt-3">
+        <p className="text-xs font-mono text-green-900 break-all">
+          {getInviteLink(newInviteToken)}
+        </p>
+
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              copyInviteLink(newInviteToken)
+            }
+            className="px-3 py-1.5 border border-green-300 rounded text-xs text-green-800 hover:bg-green-100"
+          >
+            Copy link
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              shareInviteLink(newInviteToken)
+            }
+            className="px-3 py-1.5 bg-neutral-900 text-white rounded text-xs hover:bg-neutral-800"
+          >
+            Share
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+            
 
 
             <button
@@ -708,7 +851,9 @@ export default function InviteAdmin() {
                       Used at
                     </th>
 
-                    <th className="p-4"></th>
+                    <th className="p-4">
+  Actions
+</th>
 
                   </tr>
                 </thead>
@@ -777,23 +922,34 @@ export default function InviteAdmin() {
 
 
                         <td className="p-4">
+  {status !== "used" && (
+    <div className="flex items-center gap-3 whitespace-nowrap">
+      <button
+        type="button"
+        onClick={() =>
+          copyInviteLink(
+            invite.token || invite.id
+          )
+        }
+        className="text-neutral-500 hover:text-neutral-900"
+      >
+        Copy link
+      </button>
 
-                          {status !== "used" && (
-                            <button
-                              onClick={() =>
-                                copyInvite(
-                                  invite.token ||
-                                    invite.id
-                                )
-                              }
-                              className="text-neutral-500 hover:text-neutral-900"
-                            >
-                              Copy
-                            </button>
-                          )}
-
-                        </td>
-
+      <button
+        type="button"
+        onClick={() =>
+          shareInviteLink(
+            invite.token || invite.id
+          )
+        }
+        className="text-neutral-500 hover:text-neutral-900"
+      >
+        Share
+      </button>
+    </div>
+  )}
+</td>
                       </tr>
                     );
 
