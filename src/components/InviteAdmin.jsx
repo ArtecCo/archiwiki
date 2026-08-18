@@ -14,7 +14,8 @@ import {
   orderBy,
   serverTimestamp,
   doc,
-  getDoc
+  getDoc,
+  updateDoc
 } from "firebase/firestore";
 
 import { auth, db } from "../firebase";
@@ -416,6 +417,105 @@ const getInviteLink = (token) => {
     normalizedToken
   )}`;
 };
+
+
+  /*
+ * Copy the raw invitation code only.
+ */
+const copyInviteCode = async (token) => {
+  const code = String(token || "").trim();
+
+  if (!code) {
+    setError("Unable to copy the invitation code.");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(code);
+
+    setMessage("Invitation code copied.");
+    setError("");
+  } catch (err) {
+    console.error(
+      "Unable to copy invitation code:",
+      err
+    );
+
+    setError(
+      "Unable to copy the invitation code."
+    );
+  }
+};
+
+  /*
+ * Revoke an invitation.
+ *
+ * The invitation is retained in Firestore for audit/history,
+ * but its status changes to "revoked".
+ */
+const revokeInvite = async (invite) => {
+  if (!user || !authorized) {
+    setError(
+      "You are not authorized to revoke invitations."
+    );
+    return;
+  }
+
+  const token = String(
+    invite?.token || invite?.id || ""
+  ).trim();
+
+  if (!token) {
+    setError("Unable to identify this invitation.");
+    return;
+  }
+
+  if (invite.status === "revoked") {
+    setError("This invitation has already been revoked.");
+    return;
+  }
+
+  if (invite.status === "used" || invite.used) {
+    setError("A used invitation cannot be revoked.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Revoke invitation ${token}?\n\nThis invitation will no longer be usable.`
+  );
+
+  if (!confirmed) return;
+
+  setError("");
+  setMessage("");
+
+  try {
+    await updateDoc(
+      doc(db, "pendingInvites", token),
+      {
+        status: "revoked",
+        revoked: true,
+        revokedAt: serverTimestamp(),
+        revokedBy: user.uid
+      }
+    );
+
+    setMessage(
+      `Invitation ${token} has been revoked.`
+    );
+  } catch (err) {
+    console.error(
+      "Failed to revoke invitation:",
+      err
+    );
+
+    setError(
+      err?.message ||
+        "Unable to revoke the invitation."
+    );
+  }
+};
+  
 
 
 /*
@@ -868,8 +968,8 @@ const shareInviteLink = async (token) => {
                       invite.status ||
                       (
                         invite.used
-                          ? "used"
-                          : "available"
+                          ? "Used"
+                          : "Available"
                       );
 
 
@@ -888,16 +988,18 @@ const shareInviteLink = async (token) => {
                         <td className="p-4">
 
                           <span
-                            className={
-                              status === "used"
-                                ? "text-red-700"
-                                : status === "claimed"
-                                ? "text-amber-700"
-                                : "text-green-700"
-                            }
-                          >
-                            {status}
-                          </span>
+  className={
+    status === "used"
+      ? "text-red-700"
+      : status === "revoked"
+      ? "text-neutral-500"
+      : status === "claimed"
+      ? "text-amber-700"
+      : "text-green-700"
+  }
+>
+  {status}
+</span>
 
                         </td>
 
@@ -923,32 +1025,69 @@ const shareInviteLink = async (token) => {
 
 
                         <td className="p-4">
-  {status !== "used" && (
-    <div className="flex items-center gap-3 whitespace-nowrap">
-      <button
-        type="button"
-        onClick={() =>
-          copyInviteLink(
-            invite.token || invite.id
-          )
-        }
-        className="text-neutral-500 hover:text-neutral-900"
-      >
-        Copy link
-      </button>
+  {status !== "used" && status !== "revoked" ? (
+    <details className="relative inline-block">
+      <summary className="list-none cursor-pointer select-none text-neutral-500 hover:text-neutral-900">
+        <span className="inline-flex items-center gap-1 px-2 py-1 border border-neutral-200 rounded hover:bg-neutral-50">
+          Actions
+          <span className="text-[10px]">▾</span>
+        </span>
+      </summary>
 
-      <button
-        type="button"
-        onClick={() =>
-          shareInviteLink(
-            invite.token || invite.id
-          )
-        }
-        className="text-neutral-500 hover:text-neutral-900"
-      >
-        Share
-      </button>
-    </div>
+      <div className="absolute right-0 z-20 mt-1 w-40 bg-white border border-neutral-200 rounded shadow-lg py-1">
+        <button
+          type="button"
+          onClick={() =>
+            copyInviteCode(
+              invite.token || invite.id
+            )
+          }
+          className="w-full text-left px-3 py-2 text-xs text-neutral-700 hover:bg-neutral-50"
+        >
+          Copy code
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            copyInviteLink(
+              invite.token || invite.id
+            )
+          }
+          className="w-full text-left px-3 py-2 text-xs text-neutral-700 hover:bg-neutral-50"
+        >
+          Copy link
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            shareInviteLink(
+              invite.token || invite.id
+            )
+          }
+          className="w-full text-left px-3 py-2 text-xs text-neutral-700 hover:bg-neutral-50"
+        >
+          Share
+        </button>
+
+        <div className="my-1 border-t border-neutral-100" />
+
+        <button
+          type="button"
+          onClick={() =>
+            revokeInvite(invite)
+          }
+          className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+        >
+          Revoke
+        </button>
+      </div>
+    </details>
+  ) : (
+    <span className="text-xs text-neutral-400">
+      —
+    </span>
   )}
 </td>
                       </tr>
