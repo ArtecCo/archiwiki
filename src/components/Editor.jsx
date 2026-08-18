@@ -2368,7 +2368,7 @@ return (
 
     <div
       className="
-        flex items-center justify-end
+        flex items-center
         gap-2
         mt-2
         pt-2
@@ -2377,11 +2377,19 @@ return (
         md:pt-0
         md:border-t-0
         shrink-0
+        w-full
+        md:w-auto
       "
     >
       {/* Font size */}
 
-      <div className="flex items-center gap-1.5 text-xs">
+      <div
+        className="
+          flex items-center gap-1.5 text-xs
+          mr-auto
+          md:mr-0
+        "
+      >
         <span className="hidden sm:inline">
           Size:
         </span>
@@ -2396,7 +2404,14 @@ return (
               parseInt(e.target.value, 10)
             )
           }
-          className="w-16 sm:w-20 accent-neutral-900 bg-neutral-200 h-1 rounded-lg cursor-pointer"
+          className="
+            w-16 sm:w-20
+            accent-neutral-900
+            bg-neutral-200
+            h-1
+            rounded-lg
+            cursor-pointer
+          "
           aria-label="Font size"
         />
 
