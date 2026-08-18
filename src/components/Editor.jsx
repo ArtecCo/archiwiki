@@ -2316,10 +2316,11 @@ export default function Editor({
 
 return (
   <div
-    className={`flex-1 min-h-0 flex flex-col h-full overflow-hidden ${colors.page}`}
+    className={`relative flex-1 min-h-0 flex flex-col h-full overflow-hidden ${colors.page}`}
     style={{
       fontFamily: "Montserrat, sans-serif",
       height: "100%",
+      minHeight: 0,
       maxHeight: "100dvh"
     }}
   >
@@ -2434,7 +2435,7 @@ return (
     {/* WORKING DESK                                       */}
     {/* -------------------------------------------------- */}
 
-    <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
+    <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden pb-[58px] md:pb-0">
 
       {/* ------------------------------------------------ */}
       {/* MAIN WORKSPACE                                   */}
@@ -2735,60 +2736,84 @@ return (
     </div>
 
     {/* -------------------------------------------------- */}
-    {/* STATUS BAR                                         */}
-    {/* -------------------------------------------------- */}
+{/* STATUS BAR                                         */}
+{/* -------------------------------------------------- */}
 
+<div
+  className={`
+    fixed md:absolute
+    bottom-0 left-0 right-0
+    z-40
+    shrink-0
+    border-t ${colors.border}
+    ${colors.status}
+    font-sans text-[11px] text-neutral-500
+  `}
+  style={{
+    paddingBottom:
+      "env(safe-area-inset-bottom)"
+  }}
+>
+  <div className="w-full overflow-x-auto">
     <div
-      className={`shrink-0 border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
+      className="
+        min-w-max
+        px-4 py-2.5
+        md:px-6 md:py-1.5
+        flex items-center justify-between
+        gap-8
+        whitespace-nowrap
+      "
     >
-      <div className="w-full overflow-x-auto">
-        <div className="min-w-max px-6 py-3 md:px-6 md:py-1.5 flex items-center justify-between gap-8 whitespace-nowrap">
+      <div className="flex gap-4">
+        <span>
+          Words:{" "}
+          <strong>{words}</strong>
+        </span>
 
-          <div className="flex gap-4">
-            <span>
-              Words: <strong>{words}</strong>
-            </span>
+        <span>
+          Characters:{" "}
+          <strong>{characters}</strong>
+        </span>
 
-            <span>
-              Characters: <strong>{characters}</strong>
-            </span>
+        <span>
+          Paragraphs:{" "}
+          <strong>{paragraphs}</strong>
+        </span>
 
-            <span>
-              Paragraphs: <strong>{paragraphs}</strong>
-            </span>
+        <span>
+          Headings:{" "}
+          <strong>{headings}</strong>
+        </span>
 
-            <span>
-              Headings: <strong>{headings}</strong>
-            </span>
+        <span>
+          Wiki Links:{" "}
+          <strong>{wikiLinks}</strong>
+        </span>
+      </div>
 
-            <span>
-              Wiki Links: <strong>{wikiLinks}</strong>
-            </span>
-          </div>
+      <div className="flex gap-4">
+        <span>
+          Updated:{" "}
+          <strong>{updatedAtText}</strong>
+        </span>
 
-          <div className="flex gap-4">
-            <span>
-              Updated:{" "}
-              <strong>{updatedAtText}</strong>
-            </span>
-
-            <span>
-              Status:{" "}
-              <strong
-                className={
-                  theme === "charcoal"
-                    ? "text-neutral-100"
-                    : "text-neutral-700"
-                }
-              >
-                Encrypted AES-256
-              </strong>
-            </span>
-          </div>
-
-        </div>
+        <span>
+          Status:{" "}
+          <strong
+            className={
+              theme === "charcoal"
+                ? "text-neutral-100"
+                : "text-neutral-700"
+            }
+          >
+            Encrypted AES-256
+          </strong>
+        </span>
       </div>
     </div>
+  </div>
+</div>
 
     {/* -------------------------------------------------- */}
     {/* PDF ERROR DIALOG                                   */}
