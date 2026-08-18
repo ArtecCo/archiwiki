@@ -15,7 +15,8 @@ import {
   ListOrdered,
   Quote,
   Code,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Trash2
 } from "lucide-react";
 
 export default function Editor({
@@ -2324,112 +2325,15 @@ return (
       maxHeight: "100dvh"
     }}
   >
-    {/* -------------------------------------------------- */}
-    {/* EDITOR CONTEXT MENU                                */}
-    {/* -------------------------------------------------- */}
+{/* -------------------------------------------------- */}
+{/* EDITOR CONTEXT MENU                                */}
+{/* -------------------------------------------------- */}
 
-    <div
-      className={`flex items-center justify-between gap-3 border-b ${colors.border} px-6 py-3 max-md:px-3 ${colors.toolbar}`}
-    >
-      <div className="min-w-0 flex-1 flex items-center gap-2 text-xs text-neutral-500">
-        <span className="font-medium truncate">
-          {articleBreadcrumb}
-        </span>
-
-        <span className="shrink-0">
-          &gt;
-        </span>
-
-        <span className="font-medium text-neutral-700 truncate">
-          {note.title || "Untitled"}
-        </span>
-      </div>
-
-      <div className="shrink-0 flex items-center gap-2 md:gap-4">
-        {/* Font size */}
-
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="hidden sm:inline">
-            Size:
-          </span>
-
-          <input
-            type="range"
-            min="12"
-            max="24"
-            value={Number(fontSize) || 15}
-            onChange={(e) =>
-              setFontSize(
-                parseInt(e.target.value, 10)
-              )
-            }
-            className="w-16 sm:w-20 accent-neutral-900 bg-neutral-200 h-1 rounded-lg cursor-pointer"
-            aria-label="Font size"
-          />
-
-          <span className="w-8 text-right">
-            {Number(fontSize) || 15}px
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* PDF */}
-
-          <button
-            onClick={triggerPdfDownload}
-            title="Download PDF"
-            className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600 flex items-center gap-1 text-xs`}
-          >
-            <Download size={14} />
-
-            <span className="hidden sm:inline">
-              PDF
-            </span>
-          </button>
-
-          {/* Edit / Save */}
-
-          <button
-            onClick={async () => {
-              if (isEditing) {
-                await onSaveNote(
-                  note.id,
-                  title,
-                  body
-                );
-
-                setIsEditing(false);
-              } else {
-                enterEditMode();
-              }
-            }}
-            className="py-1 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
-          >
-            {isEditing ? (
-              <>
-                <Save size={12} />
-                <span>Save</span>
-              </>
-            ) : (
-              <>
-                <Edit size={12} />
-                <span>Edit</span>
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={onCloseNote}
-            title="Close article"
-            aria-label="Close article"
-            className={`p-1.5 ${colors.buttonHover} rounded text-neutral-500 hover:text-neutral-800 transition-colors`}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
-    </div>
+<div
+  className={`flex items-center justify-between gap-3 border-b ${colors.border} px-6 py-3 max-md:px-3 ${colors.toolbar}`}
+>
+  ...
+</div>
 
     {/* -------------------------------------------------- */}
     {/* WORKING DESK                                       */}
