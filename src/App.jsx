@@ -1176,6 +1176,30 @@ function ArchiWikiApp() {
 function App() {
   const pathname = window.location.pathname;
 
+  useEffect(() => {
+    const loader = document.getElementById(
+      "archiwiki-loader"
+    );
+
+    if (!loader) return;
+
+    // /invite-admin does not mount ArchiWikiApp,
+    // so remove the initial HTML loader here.
+    if (pathname === "/invite-admin") {
+      loader.style.opacity = "0";
+      loader.style.visibility = "hidden";
+
+      const timer = setTimeout(() => {
+        loader.remove();
+      }, 450);
+
+      return () => clearTimeout(timer);
+    }
+
+    // Normal routes are handled by ArchiWikiApp's
+    // existing loader-removal effect.
+  }, [pathname]);
+
   if (pathname === "/invite-admin") {
     return <InviteAdmin />;
   }
