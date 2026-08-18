@@ -2825,13 +2825,21 @@ export default function Editor({
 {/* -------------------------------------------------- */}
 
 <div
-  className={`shrink-0 min-h-[52px] border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
+  className={`relative z-30 shrink-0 w-full min-h-[52px] max-md:min-h-[68px] border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
   style={{
+    boxSizing: "border-box",
     paddingBottom:
-      "max(14px, env(safe-area-inset-bottom, 0px))"
+      "max(16px, env(safe-area-inset-bottom, 0px))",
+    flexShrink: 0
   }}
 >
-  <div className="w-full overflow-x-auto overscroll-x-contain">
+  <div
+    className="w-full overflow-x-auto overflow-y-hidden overscroll-x-contain"
+    style={{
+      WebkitOverflowScrolling: "touch",
+      scrollbarWidth: "thin"
+    }}
+  >
     <div
       className="min-w-max px-6 py-3 md:px-6 md:py-1.5 flex items-center justify-between gap-8 whitespace-nowrap"
     >
