@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
 import { db } from "./firebase";
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
+import {
+  collection,
+  onSnapshot,
+  addDoc,
   setDoc,
-  updateDoc, 
-  doc, 
-  deleteDoc, 
-  query, 
-  where 
+  updateDoc,
+  doc,
+  deleteDoc,
+  query,
+  where
 } from "firebase/firestore";
 import { encryptData, decryptData } from "./crypto";
 import InviteAdmin from "./components/InviteAdmin";
@@ -20,37 +20,32 @@ import GraphView from "./components/GraphView";
 import { LogOut, Share2, Menu } from "lucide-react";
 
 function ArchiWikiApp() {
-
-
   useEffect(() => {
-  const loader = document.getElementById(
-    "archiwiki-loader"
-  );
+    const loader = document.getElementById("archiwiki-loader");
 
-  if (!loader) return;
+    if (!loader) return;
 
-  const timer = setTimeout(() => {
-    loader.style.opacity = "0";
-    loader.style.visibility = "hidden";
+    const timer = setTimeout(() => {
+      loader.style.opacity = "0";
+      loader.style.visibility = "hidden";
 
-    setTimeout(() => {
-      loader.remove();
-    }, 450);
-  }, 350);
+      setTimeout(() => {
+        loader.remove();
+      }, 450);
+    }, 350);
 
-  return () => clearTimeout(timer);
-}, []);
+    return () => clearTimeout(timer);
+  }, []);
 
+  const {
+    user,
+    masterKey,
+    login,
+    unlock,
+    registerWithInvite,
+    logout
+  } = useAuth();
 
-const {
-  user,
-  masterKey,
-  login,
-  unlock,
-  registerWithInvite,
-  logout
-} = useAuth();
-  
   // Auth Form parameters
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState("");
@@ -66,65 +61,84 @@ const {
   const [newNoteId, setNewNoteId] = useState(null);
   const [pendingNotes, setPendingNotes] = useState([]);
   const [fontSize, setFontSize] = useState(16);
+
   const [theme, setTheme] = useState(() => {
-  return localStorage.getItem("archiwiki-theme") || "beige";
-}); // beige | wikipedia | charcoal
-  const [activeTab, setActiveTab] = useState("editor"); // editor | graph
+    return localStorage.getItem("archiwiki-theme") || "beige";
+  }); // beige | wikipedia | charcoal
+
+  const [activeTab, setActiveTab] = useState("editor");
   const [dialog, setDialog] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-  localStorage.setItem("archiwiki-theme", theme);
-}, [theme]);
+    localStorage.setItem("archiwiki-theme", theme);
+  }, [theme]);
 
   useEffect(() => {
-  if (!user) {
-    setEmail("");
-    setPassword("");
-  }
-}, [user]);
+    if (!user) {
+      setEmail("");
+      setPassword("");
+    }
+  }, [user]);
 
   // Load Database Items
   useEffect(() => {
     if (!user) return;
 
     // Load Folders
-    const qFolders = query(collection(db, "folders"), where("userId", "==", user.uid));
-    const unsubFolders = onSnapshot(qFolders, (snap) => {
-      setFolders(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    // Load Notes
-    // Load Notes
-const qNotes = query(
-  collection(db, "notes"),
-  where("userId", "==", user.uid)
-);
-
-const unsubNotes = onSnapshot(
-  qNotes,
-  (snap) => {
-    const snapshotNotes = snap.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    setEncryptedNotes(snapshotNotes);
-
-    // Remove locally-pending notes once Firestore confirms them.
-    setPendingNotes((prev) =>
-      prev.filter(
-        (pending) =>
-          !snapshotNotes.some(
-            (note) => note.id === pending.id
-          )
-      )
+    const qFolders = query(
+      collection(db, "folders"),
+      where("userId", "==", user.uid)
     );
-  },
-  (error) => {
-    console.error("Failed to load notes from Firestore:", error);
-  }
-);
+
+    const unsubFolders = onSnapshot(
+      qFolders,
+      (snap) => {
+        setFolders(
+          snap.docs.map((folderDoc) => ({
+            id: folderDoc.id,
+            ...folderDoc.data()
+          }))
+        );
+      },
+      (error) => {
+        console.error("Failed to load folders from Firestore:", error);
+      }
+    );
+
+    // Load Notes
+    const qNotes = query(
+      collection(db, "notes"),
+      where("userId", "==", user.uid)
+    );
+
+    const unsubNotes = onSnapshot(
+      qNotes,
+      (snap) => {
+        const snapshotNotes = snap.docs.map((noteDoc) => ({
+          id: noteDoc.id,
+          ...noteDoc.data()
+        }));
+
+        setEncryptedNotes(snapshotNotes);
+
+        // Remove locally-pending notes once Firestore confirms them.
+        setPendingNotes((prev) =>
+          prev.filter(
+            (pending) =>
+              !snapshotNotes.some(
+                (note) => note.id === pending.id
+              )
+          )
+        );
+      },
+      (error) => {
+        console.error(
+          "Failed to load notes from Firestore:",
+          error
+        );
+      }
+    );
 
     return () => {
       unsubFolders();
@@ -132,126 +146,114 @@ const unsubNotes = onSnapshot(
     };
   }, [user]);
 
-  // Decrypt Notes automatically when masterKey or encryptedNotes change
-  // Decrypt Notes automatically when masterKey,
-// encryptedNotes, or pendingNotes change
-useEffect(() => {
-  if (!masterKey) {
-    setDecryptedNotes([]);
-    return;
-  }
-
-  const allNotes = [
-    ...encryptedNotes,
-    ...pendingNotes.filter(
-      (pending) =>
-        !encryptedNotes.some(
-          (note) => note.id === pending.id
-        )
-    )
-  ];
-
-  const decrypted = allNotes.map((n) => ({
-    id: n.id,
-    folderId: n.folderId ?? null,
-    title: decryptData(n.title, masterKey) || "",
-    body: decryptData(n.body, masterKey) || "",
-    updatedAt: n.updatedAt
-  }));
-
-  setDecryptedNotes(decrypted);
-}, [encryptedNotes, pendingNotes, masterKey]);
-
-useEffect(() => {
-  const restoreNoteFromUrl = () => {
-    const params = new URLSearchParams(
-      window.location.hash.substring(1)
-    );
-
-    const noteId = params.get("note");
-
-    if (noteId) {
-      setActiveNoteId(noteId);
-      setNewNoteId(null);
-      setActiveTab("editor");
-    } else {
-      setActiveNoteId(null);
-      setNewNoteId(null);
-      setActiveTab("editor");
+  // Decrypt notes automatically when masterKey,
+  // encryptedNotes, or pendingNotes change.
+  useEffect(() => {
+    if (!masterKey) {
+      setDecryptedNotes([]);
+      return;
     }
-  };
 
-  restoreNoteFromUrl();
+    const allNotes = [
+      ...encryptedNotes,
+      ...pendingNotes.filter(
+        (pending) =>
+          !encryptedNotes.some(
+            (note) => note.id === pending.id
+          )
+      )
+    ];
 
-  window.addEventListener("popstate", restoreNoteFromUrl);
-  window.addEventListener("hashchange", restoreNoteFromUrl);
+    const decrypted = allNotes.map((note) => ({
+      id: note.id,
+      folderId: note.folderId ?? null,
+      title: decryptData(note.title, masterKey) || "",
+      body: decryptData(note.body, masterKey) || "",
+      updatedAt: note.updatedAt
+    }));
 
-  return () => {
-    window.removeEventListener("popstate", restoreNoteFromUrl);
-    window.removeEventListener("hashchange", restoreNoteFromUrl);
-  };
-}, []);
+    setDecryptedNotes(decrypted);
+  }, [encryptedNotes, pendingNotes, masterKey]);
+
+  // Restore currently selected note from URL hash.
+  useEffect(() => {
+    const restoreNoteFromUrl = () => {
+      const params = new URLSearchParams(
+        window.location.hash.substring(1)
+      );
+
+      const noteId = params.get("note");
+
+      if (noteId) {
+        setActiveNoteId(noteId);
+        setNewNoteId(null);
+        setActiveTab("editor");
+      } else {
+        setActiveNoteId(null);
+        setNewNoteId(null);
+        setActiveTab("editor");
+      }
+    };
+
+    restoreNoteFromUrl();
+
+    window.addEventListener("popstate", restoreNoteFromUrl);
+    window.addEventListener("hashchange", restoreNoteFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", restoreNoteFromUrl);
+      window.removeEventListener("hashchange", restoreNoteFromUrl);
+    };
+  }, []);
 
   // Handling registration & login calls
-  // Handling registration & login calls
-const handleAuthSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
 
-  try {
-    if (requiresUnlock) {
-      // Firebase user is already authenticated.
-      // Verify the same account password and rebuild
-      // the encryption key.
-      await unlock(password);
-    } else if (isRegistering) {
-      await registerWithInvite(
-        email,
-        password,
-        inviteToken
-      );
-    } else {
-      await login(
-        email,
-        password
-      );
+    try {
+      if (requiresUnlock) {
+        // Firebase user is already authenticated.
+        // Verify the same account password and rebuild
+        // the encryption key.
+        await unlock(password);
+      } else if (isRegistering) {
+        await registerWithInvite(
+          email,
+          password,
+          inviteToken
+        );
+      } else {
+        await login(email, password);
+      }
+    } catch (err) {
+      console.error("Authentication error:", err);
+
+      if (err?.code === "auth/email-already-in-use") {
+        setError(
+          "An account with this email already exists."
+        );
+      } else if (err?.code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else if (err?.code === "auth/weak-password") {
+        setError("Please choose a stronger password.");
+      } else if (
+        err?.code === "auth/wrong-password" ||
+        err?.code === "auth/invalid-credential"
+      ) {
+        setError("Incorrect password.");
+      } else {
+        setError(
+          err?.message ||
+            "Authentication failed. Please try again."
+        );
+      }
+    } finally {
+      // Never retain authentication credentials in React state.
+      setEmail("");
+      setPassword("");
     }
-  } catch (err) {
-    console.error(
-      "Authentication error:",
-      err
-    );
-
-    if (err?.code === "auth/email-already-in-use") {
-  setError(
-    "An account with this email already exists."
-  );
-} else if (
-  err?.code === "auth/invalid-email"
-) {
-  setError("Please enter a valid email address.");
-} else if (
-  err?.code === "auth/weak-password"
-) {
-  setError("Please choose a stronger password.");
-} else if (
-  err?.code === "auth/wrong-password" ||
-  err?.code === "auth/invalid-credential"
-) {
-  setError("Incorrect password.");
-} else {
-  setError(
-    err?.message ||
-      "Authentication failed. Please try again."
-  );
-}
-
-  } finally {
-    // Never retain authentication credentials in React state.
-    setEmail("");
-    setPassword("");
-  }
-};
+  };
 
   const handleCreateFolder = async (parentId = null) => {
     setDialog({
@@ -262,61 +264,74 @@ const handleAuthSubmit = async (e) => {
       confirmLabel: "Create",
       onConfirm: async (name) => {
         if (!name.trim()) return;
+
         await addDoc(collection(db, "folders"), {
-          name: name.trim(), parentId, userId: user.uid, createdAt: Date.now()
+          name: name.trim(),
+          parentId,
+          userId: user.uid,
+          createdAt: Date.now()
         });
       }
     });
   };
 
-const handleCreateNote = async (folderId = null) => {
-  const noteRef = doc(collection(db, "notes"));
-  const now = Date.now();
-  const newNote = {
-    id: noteRef.id,
-    userId: user.uid,
-    folderId: folderId ?? null,
-    title: "",
-    body: "",
-    updatedAt: now
-  };
+  const handleCreateNote = async (folderId = null) => {
+    const noteRef = doc(collection(db, "notes"));
+    const now = Date.now();
 
-  setPendingNotes((prev) => {
-    if (prev.some((note) => note.id === newNote.id)) {
-      return prev;
-    }
-
-    return [...prev, newNote];
-  });
-
-  setNewNoteId(noteRef.id);
-  setActiveNoteId(noteRef.id);
-  setActiveTab("editor");
-
-  window.history.pushState(
-    { noteId: noteRef.id },
-    "",
-    `#note=${noteRef.id}`
-  );
-
-  try {
-    await setDoc(noteRef, {
+    const newNote = {
+      id: noteRef.id,
       userId: user.uid,
       folderId: folderId ?? null,
       title: "",
       body: "",
       updatedAt: now
-    });
-  } catch (error) {
-    console.error("Failed to create note:", error);
-    setPendingNotes((prev) =>
-      prev.filter((note) => note.id !== noteRef.id)
-    );
-  }
-};
+    };
 
-  const handleSaveNote = async (noteId, rawTitle, rawBody) => {
+    setPendingNotes((prev) => {
+      if (prev.some((note) => note.id === newNote.id)) {
+        return prev;
+      }
+
+      return [...prev, newNote];
+    });
+
+    setNewNoteId(noteRef.id);
+    setActiveNoteId(noteRef.id);
+    setActiveTab("editor");
+
+    window.history.pushState(
+      { noteId: noteRef.id },
+      "",
+      `#note=${noteRef.id}`
+    );
+
+    try {
+      await setDoc(noteRef, {
+        userId: user.uid,
+        folderId: folderId ?? null,
+        title: "",
+        body: "",
+        updatedAt: now
+      });
+    } catch (error) {
+      console.error("Failed to create note:", error);
+
+      setPendingNotes((prev) =>
+        prev.filter(
+          (note) => note.id !== noteRef.id
+        )
+      );
+    }
+  };
+
+  const handleSaveNote = async (
+    noteId,
+    rawTitle,
+    rawBody
+  ) => {
     const noteRef = doc(db, "notes", noteId);
+
     await updateDoc(noteRef, {
       title: encryptData(rawTitle, masterKey),
       body: encryptData(rawBody, masterKey),
@@ -326,62 +341,94 @@ const handleCreateNote = async (folderId = null) => {
 
   const handleDeleteFolder = async (folderId) => {
     const deleteRecursive = async (fid) => {
-      const childFolds = folders.filter(f => f.parentId === fid);
+      const childFolds = folders.filter(
+        (folder) => folder.parentId === fid
+      );
+
       for (const child of childFolds) {
         await deleteRecursive(child.id);
       }
+
       // Delete notes in folder
-      const fNotes = encryptedNotes.filter(n => n.folderId === fid);
-      for (const n of fNotes) {
-        await deleteDoc(doc(db, "notes", n.id));
+      const fNotes = encryptedNotes.filter(
+        (note) => note.folderId === fid
+      );
+
+      for (const note of fNotes) {
+        await deleteDoc(doc(db, "notes", note.id));
       }
+
       await deleteDoc(doc(db, "folders", fid));
     };
+
     setDialog({
       kind: "confirm",
       title: "Delete folder?",
-      message: "This permanently deletes the folder, its subfolders, and their notes.",
+      message:
+        "This permanently deletes the folder, its subfolders, and their notes.",
       confirmLabel: "Delete permanently",
       destructive: true,
       onConfirm: () => deleteRecursive(folderId)
     });
   };
 
-  const handleMoveItem = async (itemId, itemType, targetFolderId) => {
+  const handleMoveItem = async (
+    itemId,
+    itemType,
+    targetFolderId
+  ) => {
     if (itemType === "folder") {
-      if (itemId === targetFolderId) return; // Cannot move into self
-      await updateDoc(doc(db, "folders", itemId), { parentId: targetFolderId });
+      if (itemId === targetFolderId) return;
+
+      await updateDoc(
+        doc(db, "folders", itemId),
+        { parentId: targetFolderId }
+      );
     } else {
-      await updateDoc(doc(db, "notes", itemId), { folderId: targetFolderId });
+      await updateDoc(
+        doc(db, "notes", itemId),
+        { folderId: targetFolderId }
+      );
     }
   };
 
-  // Compile entire decrypted project as a ZIP download structure
+  // Compile entire decrypted project as a JSON backup.
   const exportAllToZip = () => {
-    const files = decryptedNotes.map(n => {
-      const path = getFolderPath(n.folderId);
+    const files = decryptedNotes.map((note) => {
+      const path = getFolderPath(note.folderId);
+
       return {
-        name: `${path}/${n.title}.md`,
-        content: `# ${n.title}\n\n${n.body}`
+        name: `${path}/${note.title}.md`,
+        content: `# ${note.title}\n\n${note.body}`
       };
     });
+
     console.log("Mock backup generated", files);
-    // Simple simulated download trigger file logic
+
     const link = document.createElement("a");
     const jsonStr = JSON.stringify(files, null, 2);
-    link.href = "data:text/plain;charset=utf-8," + encodeURIComponent(jsonStr);
+
+    link.href =
+      "data:text/plain;charset=utf-8," +
+      encodeURIComponent(jsonStr);
+
     link.download = "scribe-notebook-backup.json";
     link.click();
   };
 
   const getFolderPath = (folderId) => {
     if (!folderId) return "Root";
-    const fold = folders.find(f => f.id === folderId);
-    return fold ? `${getFolderPath(fold.parentId)}/${fold.name}` : "Root";
+
+    const fold = folders.find(
+      (folder) => folder.id === folderId
+    );
+
+    return fold
+      ? `${getFolderPath(fold.parentId)}/${fold.name}`
+      : "Root";
   };
 
   // Build the visible breadcrumb for the currently open article.
-  // Includes every parent folder and subfolder, while omitting Root.
   const getArticleBreadcrumb = (folderId) => {
     if (!folderId) return "";
 
@@ -389,7 +436,10 @@ const handleCreateNote = async (folderId = null) => {
     const visited = new Set();
     let currentId = folderId;
 
-    while (currentId && !visited.has(currentId)) {
+    while (
+      currentId &&
+      !visited.has(currentId)
+    ) {
       visited.add(currentId);
 
       const folder = folders.find(
@@ -406,25 +456,27 @@ const handleCreateNote = async (folderId = null) => {
   };
 
   const handleCloseNote = () => {
-  setNewNoteId(null);
-  setActiveNoteId(null);
-  setActiveTab("editor");
+    setNewNoteId(null);
+    setActiveNoteId(null);
+    setActiveTab("editor");
 
-  window.history.pushState(
-    {},
-    "",
-    window.location.pathname
-  );
-};
+    window.history.pushState(
+      {},
+      "",
+      window.location.pathname
+    );
+  };
 
   // Theme variable styles helper
   const getThemeClasses = () => {
-    switch(theme) {
+    switch (theme) {
       case "wikipedia":
         return "bg-[#F8F9FA] text-[#202122] font-sans";
+
       case "charcoal":
         return "bg-neutral-900 text-neutral-100 font-sans dark";
-      default: // Warm Beige
+
+      default:
         return "bg-[#F5F2EB] text-neutral-800 font-sans";
     }
   };
@@ -434,32 +486,54 @@ const handleCreateNote = async (folderId = null) => {
       case "wikipedia":
         return {
           topbar: "border-neutral-200 bg-[#F8F9FA]",
-          tabActive: "bg-neutral-200 text-neutral-900",
-          tabIdle: "hover:bg-neutral-100 text-neutral-700",
-          select: "bg-[#F8F9FA] text-[#202122] border-neutral-300",
-          option: "bg-[#F8F9FA] text-[#202122]",
-          button: "border-neutral-300 hover:bg-neutral-100",
-          logout: "text-neutral-500 hover:text-neutral-800"
+          tabActive:
+            "bg-neutral-200 text-neutral-900",
+          tabIdle:
+            "hover:bg-neutral-100 text-neutral-700",
+          select:
+            "bg-[#F8F9FA] text-[#202122] border-neutral-300",
+          option:
+            "bg-[#F8F9FA] text-[#202122]",
+          button:
+            "border-neutral-300 hover:bg-neutral-100",
+          logout:
+            "text-neutral-500 hover:text-neutral-800"
         };
+
       case "charcoal":
         return {
-          topbar: "border-neutral-800 bg-neutral-950",
-          tabActive: "bg-neutral-800 text-neutral-100",
-          tabIdle: "hover:bg-neutral-800 text-neutral-300",
-          select: "bg-neutral-950 text-neutral-100 border-neutral-700",
-          option: "bg-neutral-950 text-neutral-100",
-          button: "border-neutral-700 hover:bg-neutral-800",
-          logout: "text-neutral-400 hover:text-neutral-100"
+          topbar:
+            "border-neutral-800 bg-neutral-950",
+          tabActive:
+            "bg-neutral-800 text-neutral-100",
+          tabIdle:
+            "hover:bg-neutral-800 text-neutral-300",
+          select:
+            "bg-neutral-950 text-neutral-100 border-neutral-700",
+          option:
+            "bg-neutral-950 text-neutral-100",
+          button:
+            "border-neutral-700 hover:bg-neutral-800",
+          logout:
+            "text-neutral-400 hover:text-neutral-100"
         };
+
       default:
         return {
-          topbar: "border-[#E6E1D3] bg-[#EFEADF]",
-          tabActive: "bg-[#E2D9C8] text-neutral-900",
-          tabIdle: "hover:bg-[#E8E1D2] text-neutral-700",
-          select: "bg-[#F5F2EB] text-[#202122] border-[#D8CDBA]",
-          option: "bg-[#F5F2EB] text-[#202122]",
-          button: "border-[#D8CDBA] hover:bg-[#E8E1D2]",
-          logout: "text-neutral-500 hover:text-neutral-800"
+          topbar:
+            "border-[#E6E1D3] bg-[#EFEADF]",
+          tabActive:
+            "bg-[#E2D9C8] text-neutral-900",
+          tabIdle:
+            "hover:bg-[#E8E1D2] text-neutral-700",
+          select:
+            "bg-[#F5F2EB] text-[#202122] border-[#D8CDBA]",
+          option:
+            "bg-[#F5F2EB] text-[#202122]",
+          button:
+            "border-[#D8CDBA] hover:bg-[#E8E1D2]",
+          logout:
+            "text-neutral-500 hover:text-neutral-800"
         };
     }
   };
@@ -468,75 +542,109 @@ const handleCreateNote = async (folderId = null) => {
 
   const articleCount = decryptedNotes.length;
 
-const folderCount = folders.filter(
-  (folder) => !folder.parentId
-).length;
+  const folderCount = folders.filter(
+    (folder) => !folder.parentId
+  ).length;
 
-const subfolderCount = folders.filter(
-  (folder) => !!folder.parentId
-).length;
+  const subfolderCount = folders.filter(
+    (folder) => !!folder.parentId
+  ).length;
 
-const writingSince = user?.metadata?.creationTime
-  ? new Date(user.metadata.creationTime)
-  : null;
+  const writingSince = user?.metadata?.creationTime
+    ? new Date(user.metadata.creationTime)
+    : null;
 
-const formattedWritingSince = writingSince
-  ? `${String(writingSince.getDate()).padStart(2, "0")}-${String(
-      writingSince.getMonth() + 1
-    ).padStart(2, "0")}-${writingSince.getFullYear()}`
-  : "";
+  const formattedWritingSince = writingSince
+    ? `${String(
+        writingSince.getDate()
+      ).padStart(2, "0")}-${String(
+        writingSince.getMonth() + 1
+      ).padStart(2, "0")}-${writingSince.getFullYear()}`
+    : "";
 
+  const requiresUnlock = Boolean(
+    user && !masterKey
+  );
 
-  const requiresUnlock = Boolean(user && !masterKey);
   const dialogTheme = {
     beige: {
-      panel: "bg-[#F5F2EB] border-[#D8CDBA] text-[#202122]",
+      panel:
+        "bg-[#F5F2EB] border-[#D8CDBA] text-[#202122]",
       muted: "text-neutral-600",
-      input: "bg-white/70 border-[#D8CDBA]",
-      cancel: "border border-[#D8CDBA] bg-[#EFEADF] text-[#202122] hover:bg-[#E8E1D2]",
-      primary: "bg-neutral-900 text-white hover:bg-neutral-800"
+      input:
+        "bg-white/70 border-[#D8CDBA]",
+      cancel:
+        "border border-[#D8CDBA] bg-[#EFEADF] text-[#202122] hover:bg-[#E8E1D2]",
+      primary:
+        "bg-neutral-900 text-white hover:bg-neutral-800"
     },
+
     wikipedia: {
-      panel: "bg-[#F8F9FA] border-neutral-300 text-[#202122]",
+      panel:
+        "bg-[#F8F9FA] border-neutral-300 text-[#202122]",
       muted: "text-neutral-600",
-      input: "bg-white border-neutral-300",
-      cancel: "border border-neutral-300 bg-white text-[#202122] hover:bg-neutral-100",
-      primary: "bg-[#202122] text-white hover:bg-neutral-700"
+      input:
+        "bg-white border-neutral-300",
+      cancel:
+        "border border-neutral-300 bg-white text-[#202122] hover:bg-neutral-100",
+      primary:
+        "bg-[#202122] text-white hover:bg-neutral-700"
     },
+
     charcoal: {
-      panel: "bg-neutral-900 border-neutral-700 text-neutral-100",
+      panel:
+        "bg-neutral-900 border-neutral-700 text-neutral-100",
       muted: "text-neutral-400",
-      input: "bg-neutral-800 border-neutral-700",
-      cancel: "border border-neutral-700 bg-neutral-800 text-neutral-100 hover:bg-neutral-700",
-      primary: "bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
+      input:
+        "bg-neutral-800 border-neutral-700",
+      cancel:
+        "border border-neutral-700 bg-neutral-800 text-neutral-100 hover:bg-neutral-700",
+      primary:
+        "bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
     }
   }[theme];
 
   const confirmDialog = async () => {
     const currentDialog = dialog;
+
     if (!currentDialog) return;
-    if (currentDialog.kind === "input" && !currentDialog.value.trim()) return;
+
+    if (
+      currentDialog.kind === "input" &&
+      !currentDialog.value.trim()
+    ) {
+      return;
+    }
+
     setDialog(null);
-    await currentDialog.onConfirm(currentDialog.value || "");
+
+    await currentDialog.onConfirm(
+      currentDialog.value || ""
+    );
   };
 
   const handleLogout = async () => {
-  // Immediately clear authentication form state
-  setEmail("");
-  setPassword("");
-  setError("");
+    // Immediately clear authentication form state
+    setEmail("");
+    setPassword("");
+    setError("");
 
-  // Then terminate the Firebase session
-  await logout();
-};
+    // Then terminate the Firebase session
+    await logout();
+  };
 
   if (!user || requiresUnlock) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] font-serif p-6">
         <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8">
-          <h2 className="text-2xl font-bold font-archi tracking-wider text-center mb-1">ArchiWiki</h2>
+          <h2 className="text-2xl font-bold font-archi tracking-wider text-center mb-1">
+            ArchiWiki
+          </h2>
+
           <p className="text-xs text-neutral-400 text-center uppercase tracking-widest mb-6">
-            {requiresUnlock ? "Unlock encrypted notes" : "Your encrypted personal Wikipedia"}
+            {requiresUnlock
+              ? "Unlock encrypted notes"
+              : "Your encrypted personal Wikipedia"}
           </p>
 
           {requiresUnlock && (
@@ -546,136 +654,262 @@ const formattedWritingSince = writingSince
           )}
 
           <form
-  onSubmit={handleAuthSubmit}
-  autoComplete="off"
-  className="space-y-4"
->
+            onSubmit={handleAuthSubmit}
+            autoComplete="off"
+            className="space-y-4"
+          >
             <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Email</label>
-              <input 
-                type="email" 
-                required 
+              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">
+                Email
+              </label>
+
+              <input
+                type="email"
+                required
                 autoComplete="off"
-                value={requiresUnlock ? user.email : email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={
+                  requiresUnlock
+                    ? user.email
+                    : email
+                }
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
                 disabled={requiresUnlock}
                 className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800 disabled:cursor-not-allowed disabled:text-neutral-500"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Password</label>
-              <input 
-                type="password" 
+              <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">
+                Password
+              </label>
+
+              <input
+                type="password"
                 required
                 autoComplete="new-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
                 className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800"
               />
             </div>
 
             {isRegistering && !requiresUnlock && (
               <div>
-                <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">Invite Token</label>
-                <input 
-                  type="text" 
-                  required 
+                <label className="block text-xs font-semibold mb-1 uppercase tracking-wider">
+                  Invite Token
+                </label>
+
+                <input
+                  type="text"
+                  required
                   value={inviteToken}
-                  onChange={(e) => setInviteToken(e.target.value)}
+                  onChange={(e) =>
+                    setInviteToken(e.target.value)
+                  }
                   className="w-full text-sm border border-neutral-300 rounded px-3 py-2 bg-neutral-50/50 focus:outline-none focus:border-neutral-800"
                   placeholder="Invite token code"
                 />
               </div>
             )}
 
-            {error && <p className="text-xs text-neutral-500 italic mt-2">{error}</p>}
+            {error && (
+              <p className="text-xs text-neutral-500 italic mt-2">
+                {error}
+              </p>
+            )}
 
-            <button 
+            <button
               type="submit"
               className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-sm font-semibold tracking-wider transition-colors"
             >
-              {requiresUnlock ? "Unlock Notes" : isRegistering ? "Register Account" : "Access Your Encrypted Articles"}
+              {requiresUnlock
+                ? "Unlock Notes"
+                : isRegistering
+                ? "Register Account"
+                : "Access Your Encrypted Articles"}
             </button>
           </form>
 
           {requiresUnlock && (
-  <button
-    type="button"
-    onClick={handleLogout}
-    className="w-full mt-3 py-2 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
-  >
-    Log out
-  </button>
-)}
-
-          {!requiresUnlock && <div className="mt-6 pt-4 border-t border-neutral-200 text-center">
-            <button 
-              onClick={() => setIsRegistering(!isRegistering)}
-              className="text-xs text-neutral-500 hover:underline"
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full mt-3 py-2 text-xs text-neutral-500 hover:text-neutral-900 transition-colors"
             >
-              {isRegistering ? "Already invited? Login" : "Have an invite code? Register"}
+              Log out
             </button>
-          </div>}
+          )}
+
+          {!requiresUnlock && (
+            <div className="mt-6 pt-4 border-t border-neutral-200 text-center">
+              <button
+                onClick={() =>
+                  setIsRegistering(!isRegistering)
+                }
+                className="text-xs text-neutral-500 hover:underline"
+              >
+                {isRegistering
+                  ? "Already invited? Login"
+                  : "Have an invite code? Register"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`h-screen flex overflow-hidden ${getThemeClasses()}`}>
-      <div className={`hidden md:block h-full ${isSidebarOpen ? "max-md:block" : ""}`}>
-      <Sidebar 
-        theme={theme}
-        folders={folders}
-        notes={decryptedNotes}
-        activeNoteId={activeNoteId}
-        onSelectNote={(id) => {
-  setNewNoteId(null);
-  setActiveNoteId(id);
-  setActiveTab("editor");
-  window.history.pushState(
-    { noteId: id },
-    "",
-    `#note=${id}`
-  );
-}}
-        onCreateFolder={handleCreateFolder}
-        onCreateNote={handleCreateNote}
-        onRenameFolder={(id) => setDialog({
-          kind: "input",
-          title: "Rename folder",
-          label: "Folder name",
-          value: folders.find((folder) => folder.id === id)?.name || "",
-          confirmLabel: "Rename",
-          onConfirm: (name) => updateDoc(doc(db, "folders", id), { name: name.trim() })
-        })}
-        onDeleteFolder={handleDeleteFolder}
-        onMoveItem={handleMoveItem}
-        onDeleteNote={(id) => setDialog({
-          kind: "confirm",
-          title: "Delete note?",
-          message: "This article will be permanently deleted.",
-          confirmLabel: "Delete permanently",
-          destructive: true,
-          onConfirm: async () => {
-            await deleteDoc(doc(db, "notes", id));
-            if (activeNoteId === id) setActiveNoteId(null);
+    <div
+      className={`h-screen flex overflow-hidden ${getThemeClasses()}`}
+    >
+      <div
+        className={`hidden md:block h-full ${
+          isSidebarOpen
+            ? "max-md:block"
+            : ""
+        }`}
+      >
+        <Sidebar
+          theme={theme}
+          folders={folders}
+          notes={decryptedNotes}
+          activeNoteId={activeNoteId}
+          onSelectNote={(id) => {
+            setNewNoteId(null);
+            setActiveNoteId(id);
+            setActiveTab("editor");
+
+            window.history.pushState(
+              { noteId: id },
+              "",
+              `#note=${id}`
+            );
+          }}
+          onCreateFolder={handleCreateFolder}
+          onCreateNote={handleCreateNote}
+          onRenameFolder={(id) =>
+            setDialog({
+              kind: "input",
+              title: "Rename folder",
+              label: "Folder name",
+              value:
+                folders.find(
+                  (folder) =>
+                    folder.id === id
+                )?.name || "",
+              confirmLabel: "Rename",
+              onConfirm: (name) =>
+                updateDoc(
+                  doc(db, "folders", id),
+                  { name: name.trim() }
+                )
+            })
           }
-        })}
-      />
+          onDeleteFolder={handleDeleteFolder}
+          onMoveItem={handleMoveItem}
+          onDeleteNote={(id) =>
+            setDialog({
+              kind: "confirm",
+              title: "Delete note?",
+              message:
+                "This article will be permanently deleted.",
+              confirmLabel:
+                "Delete permanently",
+              destructive: true,
+              onConfirm: async () => {
+                await deleteDoc(
+                  doc(db, "notes", id)
+                );
+
+                if (activeNoteId === id) {
+                  setActiveNoteId(null);
+                }
+              }
+            })
+          }
+        />
       </div>
 
       {isSidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-          <button type="button" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 w-full bg-black/40" />
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={() =>
+              setIsSidebarOpen(false)
+            }
+            className="absolute inset-0 w-full bg-black/40"
+          />
+
           <div className="relative z-10 h-full w-64 shadow-xl">
-            <Sidebar 
-              theme={theme} folders={folders} notes={decryptedNotes} activeNoteId={activeNoteId}
-              onSelectNote={(id) => { setNewNoteId(null); setActiveNoteId(id); setActiveTab("editor"); setIsSidebarOpen(false); window.history.pushState({ noteId: id }, "", `#note=${id}`); }}
-              onCreateFolder={handleCreateFolder} onCreateNote={handleCreateNote}
-              onRenameFolder={(id) => setDialog({ kind: "input", title: "Rename folder", label: "Folder name", value: folders.find((folder) => folder.id === id)?.name || "", confirmLabel: "Rename", onConfirm: (name) => updateDoc(doc(db, "folders", id), { name: name.trim() }) })}
-              onDeleteFolder={handleDeleteFolder} onMoveItem={handleMoveItem}
-              onDeleteNote={(id) => setDialog({ kind: "confirm", title: "Delete note?", message: "This manuscript will be permanently deleted.", confirmLabel: "Delete permanently", destructive: true, onConfirm: async () => { await deleteDoc(doc(db, "notes", id)); if (activeNoteId === id) setActiveNoteId(null); } })}
+            <Sidebar
+              theme={theme}
+              folders={folders}
+              notes={decryptedNotes}
+              activeNoteId={activeNoteId}
+              onSelectNote={(id) => {
+                setNewNoteId(null);
+                setActiveNoteId(id);
+                setActiveTab("editor");
+                setIsSidebarOpen(false);
+
+                window.history.pushState(
+                  { noteId: id },
+                  "",
+                  `#note=${id}`
+                );
+              }}
+              onCreateFolder={handleCreateFolder}
+              onCreateNote={handleCreateNote}
+              onRenameFolder={(id) =>
+                setDialog({
+                  kind: "input",
+                  title: "Rename folder",
+                  label: "Folder name",
+                  value:
+                    folders.find(
+                      (folder) =>
+                        folder.id === id
+                    )?.name || "",
+                  confirmLabel: "Rename",
+                  onConfirm: (name) =>
+                    updateDoc(
+                      doc(db, "folders", id),
+                      { name: name.trim() }
+                    )
+                })
+              }
+              onDeleteFolder={
+                handleDeleteFolder
+              }
+              onMoveItem={handleMoveItem}
+              onDeleteNote={(id) =>
+                setDialog({
+                  kind: "confirm",
+                  title: "Delete note?",
+                  message:
+                    "This manuscript will be permanently deleted.",
+                  confirmLabel:
+                    "Delete permanently",
+                  destructive: true,
+                  onConfirm: async () => {
+                    await deleteDoc(
+                      doc(db, "notes", id)
+                    );
+
+                    if (
+                      activeNoteId === id
+                    ) {
+                      setActiveNoteId(null);
+                    }
+                  }
+                })
+              }
             />
           </div>
         </div>
@@ -683,21 +917,42 @@ const formattedWritingSince = writingSince
 
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         {/* Navigation Tabs */}
-        <div className={`flex justify-between items-center gap-3 px-6 py-2 max-md:px-3 max-md:flex-wrap border-b ${shellTheme.topbar}`}>
+        <div
+          className={`flex justify-between items-center gap-3 px-6 py-2 max-md:px-3 max-md:flex-wrap border-b ${shellTheme.topbar}`}
+        >
           <div className="flex gap-2 max-md:w-full">
-            <button type="button" onClick={() => setIsSidebarOpen(true)} className="md:hidden p-1" aria-label="Open navigation"><Menu size={18} /></button>
             <button
-              onClick={() => setActiveTab("editor")}
+              type="button"
+              onClick={() =>
+                setIsSidebarOpen(true)
+              }
+              className="md:hidden p-1"
+              aria-label="Open navigation"
+            >
+              <Menu size={18} />
+            </button>
+
+            <button
+              onClick={() =>
+                setActiveTab("editor")
+              }
               className={`px-3 py-1 rounded text-xs font-semibold ${
-                activeTab === "editor" ? shellTheme.tabActive : shellTheme.tabIdle
+                activeTab === "editor"
+                  ? shellTheme.tabActive
+                  : shellTheme.tabIdle
               }`}
             >
               Article Editor
             </button>
+
             <button
-              onClick={() => setActiveTab("graph")}
+              onClick={() =>
+                setActiveTab("graph")
+              }
               className={`px-3 py-1 rounded text-xs font-semibold ${
-                activeTab === "graph" ? shellTheme.tabActive : shellTheme.tabIdle
+                activeTab === "graph"
+                  ? shellTheme.tabActive
+                  : shellTheme.tabIdle
               }`}
             >
               Interactive Graph
@@ -708,25 +963,56 @@ const formattedWritingSince = writingSince
             {/* Theme switcher */}
             <div className="flex items-center gap-1">
               <span>Theme:</span>
-              <select 
-                value={theme} 
-                onChange={(e) => setTheme(e.target.value)}
+
+              <select
+                value={theme}
+                onChange={(e) =>
+                  setTheme(e.target.value)
+                }
                 className={`border rounded px-1 py-0.5 text-xs focus:outline-none ${shellTheme.select}`}
               >
-                <option className={shellTheme.option} value="beige">Warm Beige</option>
-                <option className={shellTheme.option} value="wikipedia">Wikipedia Light</option>
-                <option className={shellTheme.option} value="charcoal">OLED Dark</option>
+                <option
+                  className={shellTheme.option}
+                  value="beige"
+                >
+                  Warm Beige
+                </option>
+
+                <option
+                  className={shellTheme.option}
+                  value="wikipedia"
+                >
+                  Wikipedia Light
+                </option>
+
+                <option
+                  className={shellTheme.option}
+                  value="charcoal"
+                >
+                  OLED Dark
+                </option>
               </select>
             </div>
 
-            <button 
+            <button
               onClick={exportAllToZip}
               className={`flex py-1 px-2.5 border rounded items-center gap-1 ${shellTheme.button}`}
             >
-              <Share2 size={12} /> <span className="hidden sm:inline">Backup (.json)</span><span className="sm:hidden">Backup</span>
+              <Share2 size={12} />
+
+              <span className="hidden sm:inline">
+                Backup (.json)
+              </span>
+
+              <span className="sm:hidden">
+                Backup
+              </span>
             </button>
 
-            <button onClick={handleLogout} className={`p-1 ${shellTheme.logout}`}>
+            <button
+              onClick={handleLogout}
+              className={`p-1 ${shellTheme.logout}`}
+            >
               <LogOut size={14} />
             </button>
           </div>
@@ -735,74 +1021,158 @@ const formattedWritingSince = writingSince
         {/* Content Render Frame */}
         <div className="flex-1 overflow-hidden">
           {activeTab === "editor" ? (
-            <Editor 
-  theme={theme}
-  newNoteId={newNoteId}
-  note={decryptedNotes.find(n => n.id === activeNoteId)}
-  articleCount={articleCount}
-  folderCount={folderCount}
-  subfolderCount={subfolderCount}
-  writingSince={formattedWritingSince}
-  breadcrumb={getArticleBreadcrumb(
-    decryptedNotes.find(n => n.id === activeNoteId)?.folderId
-  )}
-  onSaveNote={handleSaveNote}
-  notesPool={decryptedNotes}
-  fontSize={fontSize}
-  setFontSize={setFontSize}
-  onCloseNote={handleCloseNote}
-  onNavigateToNote={(id) => {
-  setNewNoteId(null);
-  setActiveNoteId(id);
-  setActiveTab("editor");
-  window.history.pushState(
-    { noteId: id },
-    "",
-    `#note=${id}`
-  );
-}}
-/>
+            <Editor
+              theme={theme}
+              newNoteId={newNoteId}
+              note={decryptedNotes.find(
+                (note) =>
+                  note.id === activeNoteId
+              )}
+              articleCount={articleCount}
+              folderCount={folderCount}
+              subfolderCount={subfolderCount}
+              writingSince={
+                formattedWritingSince
+              }
+              breadcrumb={getArticleBreadcrumb(
+                decryptedNotes.find(
+                  (note) =>
+                    note.id === activeNoteId
+                )?.folderId
+              )}
+              onSaveNote={handleSaveNote}
+              notesPool={decryptedNotes}
+              fontSize={fontSize}
+              setFontSize={setFontSize}
+              onCloseNote={handleCloseNote}
+              onNavigateToNote={(id) => {
+                setNewNoteId(null);
+                setActiveNoteId(id);
+                setActiveTab("editor");
+
+                window.history.pushState(
+                  { noteId: id },
+                  "",
+                  `#note=${id}`
+                );
+              }}
+            />
           ) : (
-            <GraphView 
+            <GraphView
               theme={theme}
               notes={decryptedNotes}
               onNavigateToNote={(id) => {
-  setNewNoteId(null);
-  setActiveNoteId(id);
-  setActiveTab("editor");
-  window.history.pushState(
-    { noteId: id },
-    "",
-    `#note=${id}`
-  );
-}}
+                setNewNoteId(null);
+                setActiveNoteId(id);
+                setActiveTab("editor");
+
+                window.history.pushState(
+                  { noteId: id },
+                  "",
+                  `#note=${id}`
+                );
+              }}
             />
           )}
         </div>
       </div>
 
       {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-          <div className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme.panel}`}>
-            <h2 id="dialog-title" className="text-base font-semibold">{dialog.title}</h2>
-            {dialog.message && <p className={`mt-2 text-sm ${dialogTheme.muted}`}>{dialog.message}</p>}
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dialog-title"
+        >
+          <div
+            className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme.panel}`}
+          >
+            <h2
+              id="dialog-title"
+              className="text-base font-semibold"
+            >
+              {dialog.title}
+            </h2>
+
+            {dialog.message && (
+              <p
+                className={`mt-2 text-sm ${dialogTheme.muted}`}
+              >
+                {dialog.message}
+              </p>
+            )}
+
             {dialog.kind === "input" && (
-              <label className={`mt-4 block text-xs font-medium ${dialogTheme.muted}`}>
+              <label
+                className={`mt-4 block text-xs font-medium ${dialogTheme.muted}`}
+              >
                 {dialog.label}
-                <input autoFocus value={dialog.value} onChange={(event) => setDialog((current) => ({ ...current, value: event.target.value }))} onKeyDown={(event) => event.key === "Enter" && confirmDialog()} className={`mt-1.5 w-full rounded border px-3 py-2 text-sm outline-none ${dialogTheme.input}`} />
+
+                <input
+                  autoFocus
+                  value={dialog.value}
+                  onChange={(event) =>
+                    setDialog((current) => ({
+                      ...current,
+                      value: event.target.value
+                    }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      confirmDialog();
+                    }
+                  }}
+                  className={`mt-1.5 w-full rounded border px-3 py-2 text-sm outline-none ${dialogTheme.input}`}
+                />
               </label>
             )}
+
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setDialog(null)} className={`rounded px-3 py-1.5 text-sm ${dialogTheme.cancel}`}>Cancel</button>
-              <button type="button" onClick={confirmDialog} className={`rounded px-3 py-1.5 text-sm font-medium ${dialog.destructive ? "bg-red-700 text-white hover:bg-red-800" : dialogTheme.primary}`}>{dialog.confirmLabel}</button>
+              <button
+                type="button"
+                onClick={() =>
+                  setDialog(null)
+                }
+                className={`rounded px-3 py-1.5 text-sm ${dialogTheme.cancel}`}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDialog}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${
+                  dialog.destructive
+                    ? "bg-red-700 text-white hover:bg-red-800"
+                    : dialogTheme.primary
+                }`}
+              >
+                {dialog.confirmLabel}
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-  
 }
+
+/*
+ * Route selection happens OUTSIDE ArchiWikiApp.
+ *
+ * This is intentional.
+ *
+ * ArchiWikiApp contains many React hooks. If we put:
+ *
+ *   if (pathname === "/invite-admin") return <InviteAdmin />;
+ *
+ * inside ArchiWikiApp, React can see a different number/order
+ * of hooks depending on the current route.
+ *
+ * Keeping the route switch in this wrapper means ArchiWikiApp
+ * either mounts normally with all of its hooks, or does not mount
+ * at all when /invite-admin is requested.
+ */
 function App() {
   const pathname = window.location.pathname;
 
@@ -814,4 +1184,3 @@ function App() {
 }
 
 export default App;
-
