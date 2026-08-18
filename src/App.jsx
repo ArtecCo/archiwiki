@@ -53,6 +53,33 @@ function ArchiWikiApp() {
   const [inviteToken, setInviteToken] = useState("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const inviteFromUrl = params.get("invite");
+
+  if (!inviteFromUrl) return;
+
+  const normalizedInvite = inviteFromUrl.trim();
+
+  if (!normalizedInvite) return;
+
+  setInviteToken(normalizedInvite);
+  setIsRegistering(true);
+
+  // Remove the invite code from the visible URL
+  // without reloading the page.
+  const cleanUrl =
+    window.location.pathname +
+    window.location.hash;
+
+  window.history.replaceState(
+    {},
+    "",
+    cleanUrl
+  );
+}, []);
+  
+
   // Application States
   const [folders, setFolders] = useState([]);
   const [encryptedNotes, setEncryptedNotes] = useState([]);
@@ -218,12 +245,15 @@ function ArchiWikiApp() {
         // the encryption key.
         await unlock(password);
       } else if (isRegistering) {
-        await registerWithInvite(
-          email,
-          password,
-          inviteToken
-        );
-      } else {
+  await registerWithInvite(
+    email,
+    password,
+    inviteToken
+  );
+
+  setInviteToken("");
+  setIsRegistering(false);
+} else {
         await login(email, password);
       }
     } catch (err) {
@@ -624,14 +654,14 @@ function ArchiWikiApp() {
   };
 
   const handleLogout = async () => {
-    // Immediately clear authentication form state
-    setEmail("");
-    setPassword("");
-    setError("");
+  setEmail("");
+  setPassword("");
+  setInviteToken("");
+  setError("");
+  setIsRegistering(false);
 
-    // Then terminate the Firebase session
-    await logout();
-  };
+  await logout();
+};
 
   if (!user || requiresUnlock) {
     return (
