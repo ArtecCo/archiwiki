@@ -19,11 +19,8 @@ import Editor from "./components/Editor";
 import GraphView from "./components/GraphView";
 import { LogOut, Share2, Menu } from "lucide-react";
 
-export default function App() {
+function ArchiWikiApp() {
 
-  if (window.location.pathname === "/invite-admin") {
-  return <InviteAdmin />;
-}
 
   useEffect(() => {
   const loader = document.getElementById(
@@ -804,4 +801,17 @@ const formattedWritingSince = writingSince
       )}
     </div>
   );
+  
 }
+function App() {
+  const pathname = window.location.pathname;
+
+  if (pathname === "/invite-admin") {
+    return <InviteAdmin />;
+  }
+
+  return <ArchiWikiApp />;
+}
+
+export default App;
+
