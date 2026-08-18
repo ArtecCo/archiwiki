@@ -1052,41 +1052,61 @@ function ArchiWikiApp() {
         <div className="flex-1 overflow-hidden">
           {activeTab === "editor" ? (
             <Editor
-              theme={theme}
-              newNoteId={newNoteId}
-              note={decryptedNotes.find(
-                (note) =>
-                  note.id === activeNoteId
-              )}
-              articleCount={articleCount}
-              folderCount={folderCount}
-              subfolderCount={subfolderCount}
-              writingSince={
-                formattedWritingSince
-              }
-              breadcrumb={getArticleBreadcrumb(
-                decryptedNotes.find(
-                  (note) =>
-                    note.id === activeNoteId
-                )?.folderId
-              )}
-              onSaveNote={handleSaveNote}
-              notesPool={decryptedNotes}
-              fontSize={fontSize}
-              setFontSize={setFontSize}
-              onCloseNote={handleCloseNote}
-              onNavigateToNote={(id) => {
-                setNewNoteId(null);
-                setActiveNoteId(id);
-                setActiveTab("editor");
+  theme={theme}
+  newNoteId={newNoteId}
+  note={decryptedNotes.find(
+    (note) =>
+      note.id === activeNoteId
+  )}
 
-                window.history.pushState(
-                  { noteId: id },
-                  "",
-                  `#note=${id}`
-                );
-              }}
-            />
+  onDeleteNote={(id) =>
+    setDialog({
+      kind: "confirm",
+      title: "Delete note?",
+      message:
+        "This article will be permanently deleted.",
+      confirmLabel:
+        "Delete permanently",
+      destructive: true,
+      onConfirm: async () => {
+        await deleteDoc(
+          doc(db, "notes", id)
+        );
+
+        if (activeNoteId === id) {
+          setActiveNoteId(null);
+        }
+      }
+    })
+  }
+
+  articleCount={articleCount}
+  folderCount={folderCount}
+  subfolderCount={subfolderCount}
+  writingSince={formattedWritingSince}
+  breadcrumb={getArticleBreadcrumb(
+    decryptedNotes.find(
+      (note) =>
+        note.id === activeNoteId
+    )?.folderId
+  )}
+  onSaveNote={handleSaveNote}
+  notesPool={decryptedNotes}
+  fontSize={fontSize}
+  setFontSize={setFontSize}
+  onCloseNote={handleCloseNote}
+  onNavigateToNote={(id) => {
+    setNewNoteId(null);
+    setActiveNoteId(id);
+    setActiveTab("editor");
+
+    window.history.pushState(
+      { noteId: id },
+      "",
+      `#note=${id}`
+    );
+  }}
+/>
           ) : (
             <GraphView
               theme={theme}
