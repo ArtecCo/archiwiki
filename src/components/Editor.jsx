@@ -2317,7 +2317,7 @@ export default function Editor({
 
   return (
     <div
-      className={`flex-1 min-h-0 flex flex-col h-full ${colors.page}`}
+      className={`flex-1 min-h-0 min-w-0 h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col ${colors.page}`}
       style={{
         fontFamily:
           "Montserrat, sans-serif"
@@ -2825,11 +2825,16 @@ export default function Editor({
 {/* -------------------------------------------------- */}
 
 <div
-  className={`shrink-0 border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
+  className={`shrink-0 min-h-[52px] border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
+  style={{
+    paddingBottom:
+      "max(14px, env(safe-area-inset-bottom, 0px))"
+  }}
 >
-  <div className="w-full overflow-x-auto">
-    <div className="min-w-max px-6 py-3 md:px-6 md:py-1.5 flex items-center justify-between gap-8 whitespace-nowrap">
-
+  <div className="w-full overflow-x-auto overscroll-x-contain">
+    <div
+      className="min-w-max px-6 py-3 md:px-6 md:py-1.5 flex items-center justify-between gap-8 whitespace-nowrap"
+    >
       <div className="flex gap-4">
         <span>
           Words:{" "}
@@ -2876,7 +2881,6 @@ export default function Editor({
           </strong>
         </span>
       </div>
-
     </div>
   </div>
 </div>
