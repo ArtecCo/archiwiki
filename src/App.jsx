@@ -21,6 +21,10 @@ import { LogOut, Share2, Menu } from "lucide-react";
 
 export default function App() {
 
+  if (window.location.pathname === "/invite-admin") {
+  return <InviteAdmin />;
+}
+
   useEffect(() => {
   const loader = document.getElementById(
     "archiwiki-loader"
