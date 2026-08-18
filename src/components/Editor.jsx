@@ -2820,79 +2820,58 @@ export default function Editor({
           </div>
         </div>
       </div>
-{/* -------------------------------------------------- */}
-{/* STATUS BAR                                         */}
-{/* -------------------------------------------------- */}
+ <div
+        className={`border-t ${colors.border} ${colors.status} px-6 py-1.5 flex justify-between items-center text-[11px] font-sans text-neutral-500`}
+      >
+        <div className="flex gap-4">
+          <span>
+            Words:{" "}
+            <strong>{words}</strong>
+          </span>
 
-<div
-  className={`fixed left-0 right-0 bottom-0 z-[9999] w-full border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
-  style={{
-    paddingBottom:
-      "max(16px, env(safe-area-inset-bottom, 0px))",
-    minHeight:
-      "calc(52px + max(16px, env(safe-area-inset-bottom, 0px)))",
-    boxSizing: "border-box"
-  }}
->
-  <div
-    className="w-full overflow-x-auto overflow-y-hidden overscroll-x-contain"
-    style={{
-      WebkitOverflowScrolling: "touch",
-      scrollbarWidth: "thin"
-    }}
-  >
-    <div
-      className="min-w-max px-6 py-3 md:px-6 md:py-1.5 flex items-center justify-between gap-8 whitespace-nowrap"
-    >
-      <div className="flex gap-4">
-        <span>
-          Words:{" "}
-          <strong>{words}</strong>
-        </span>
+          <span>
+            Characters:{" "}
+            <strong>{characters}</strong>
+          </span>
 
-        <span>
-          Characters:{" "}
-          <strong>{characters}</strong>
-        </span>
+          <span>
+            Paragraphs:{" "}
+            <strong>{paragraphs}</strong>
+          </span>
 
-        <span>
-          Paragraphs:{" "}
-          <strong>{paragraphs}</strong>
-        </span>
+          <span>
+            Headings:{" "}
+            <strong>{headings}</strong>
+          </span>
 
-        <span>
-          Headings:{" "}
-          <strong>{headings}</strong>
-        </span>
+          <span>
+            Wiki Links:{" "}
+            <strong>{wikiLinks}</strong>
+          </span>
+        </div>
 
-        <span>
-          Wiki Links:{" "}
-          <strong>{wikiLinks}</strong>
-        </span>
+        <div className="flex gap-4">
+          <span>
+            Updated:{" "}
+            <strong>
+              {updatedAtText}
+            </strong>
+          </span>
+
+          <span>
+            Status:{" "}
+            <strong
+              className={
+                theme === "charcoal"
+                  ? "text-neutral-100"
+                  : "text-neutral-700"
+              }
+            >
+              Encrypted AES-256
+            </strong>
+          </span>
+        </div>
       </div>
-
-      <div className="flex gap-4">
-        <span>
-          Updated:{" "}
-          <strong>{updatedAtText}</strong>
-        </span>
-
-        <span>
-          Status:{" "}
-          <strong
-            className={
-              theme === "charcoal"
-                ? "text-neutral-100"
-                : "text-neutral-700"
-            }
-          >
-            Encrypted AES-256
-          </strong>
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
 
       {pdfError && (
         <div
