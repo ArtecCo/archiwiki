@@ -79,57 +79,57 @@ export default function Editor({
    */
 
   const themeClasses = {
-    beige: {
-      page: "bg-[#F5F2EB] text-[#202122]",
-      toolbar: "bg-neutral-100/50",
-      input: "text-neutral-800",
-      sidebar: "bg-neutral-100/30",
-      card: "bg-white",
-      dropdown: "bg-white",
-      hover: "hover:bg-neutral-100",
-      active: "bg-neutral-100",
-      muted: "text-neutral-500",
-      border: "border-neutral-300",
-      buttonHover: "hover:bg-neutral-200",
-      status: "bg-neutral-100/80",
-      notification: "bg-neutral-200",
-      notificationText: "text-neutral-800"
-    },
+  beige: {
+    page: "bg-[#F5F2EB] text-[#202122]",
+    toolbar: "bg-neutral-100/50",
+    input: "text-neutral-800",
+    sidebar: "bg-neutral-100/30",
+    card: "bg-white",
+    dropdown: "bg-white",
+    hover: "hover:bg-neutral-100",
+    active: "bg-neutral-100",
+    muted: "text-neutral-500",
+    border: "border-neutral-300",
+    buttonHover: "hover:bg-neutral-200",
+    status: "bg-[#EAE5DB]",
+    notification: "bg-neutral-200",
+    notificationText: "text-neutral-800"
+  },
 
-    wikipedia: {
-      page: "bg-[#F8F9FA] text-[#202122]",
-      toolbar: "bg-neutral-100/50",
-      input: "text-[#202122]",
-      sidebar: "bg-neutral-100/30",
-      card: "bg-white",
-      dropdown: "bg-white",
-      hover: "hover:bg-neutral-100",
-      active: "bg-neutral-100",
-      muted: "text-neutral-500",
-      border: "border-neutral-300",
-      buttonHover: "hover:bg-neutral-200",
-      status: "bg-neutral-100/80",
-      notification: "bg-neutral-200",
-      notificationText: "text-neutral-800"
-    },
+  wikipedia: {
+    page: "bg-[#F8F9FA] text-[#202122]",
+    toolbar: "bg-neutral-100/50",
+    input: "text-[#202122]",
+    sidebar: "bg-neutral-100/30",
+    card: "bg-white",
+    dropdown: "bg-white",
+    hover: "hover:bg-neutral-100",
+    active: "bg-neutral-100",
+    muted: "text-neutral-500",
+    border: "border-neutral-300",
+    buttonHover: "hover:bg-neutral-200",
+    status: "bg-[#FFFFFF]",
+    notification: "bg-neutral-200",
+    notificationText: "text-neutral-800"
+  },
 
-    charcoal: {
-      page: "bg-neutral-900 text-neutral-100",
-      toolbar: "bg-neutral-900",
-      input: "text-neutral-100",
-      sidebar: "bg-neutral-900",
-      card: "bg-neutral-800",
-      dropdown: "bg-neutral-800",
-      hover: "hover:bg-neutral-800",
-      active: "bg-neutral-800",
-      muted: "text-neutral-400",
-      border: "border-neutral-700",
-      buttonHover: "hover:bg-neutral-800",
-      status: "bg-neutral-900",
-      notification: "bg-neutral-800",
-      notificationText: "text-neutral-100"
-    }
-  };
+  charcoal: {
+    page: "bg-neutral-900 text-neutral-100",
+    toolbar: "bg-neutral-900",
+    input: "text-neutral-100",
+    sidebar: "bg-neutral-900",
+    card: "bg-neutral-800",
+    dropdown: "bg-neutral-800",
+    hover: "hover:bg-neutral-800",
+    active: "bg-neutral-800",
+    muted: "text-neutral-400",
+    border: "border-neutral-700",
+    buttonHover: "hover:bg-neutral-800",
+    status: "bg-neutral-900",
+    notification: "bg-neutral-800",
+    notificationText: "text-neutral-100"
+  }
+};
 
   const colors =
     themeClasses[theme] || themeClasses.beige;
