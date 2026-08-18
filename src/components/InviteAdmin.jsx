@@ -7,7 +7,7 @@ import {
 
 import {
   collection,
-  addDoc,
+  setDoc,
   onSnapshot,
   query,
   orderBy,
@@ -15,6 +15,7 @@ import {
   doc,
   getDoc
 } from "firebase/firestore";
+
 
 import { auth, db } from "../firebase";
 
@@ -179,21 +180,22 @@ export default function InviteAdmin() {
     try {
       const token = generateInviteCode();
 
-      await addDoc(
-        collection(db, "pendingInvites"),
-        {
-          token,
-          status: "available",
-          used: false,
-          claimId: null,
-          claimedAt: null,
-          usedBy: null,
-          usedEmail: null,
-          usedAt: null,
-          createdAt: serverTimestamp(),
-          createdBy: user.uid
-        }
-      );
+      await setDoc(
+  doc(db, "pendingInvites", token),
+  {
+    token,
+    status: "available",
+    used: false,
+    claimId: null,
+    claimedAt: null,
+    usedBy: null,
+    usedEmail: null,
+    usedAt: null,
+    createdAt: serverTimestamp(),
+    createdBy: user.uid
+  }
+);
+
 
       setMessage(
         `Invitation created: ${token}`
