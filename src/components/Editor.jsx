@@ -91,7 +91,7 @@ export default function Editor({
     muted: "text-neutral-500",
     border: "border-neutral-300",
     buttonHover: "hover:bg-neutral-200",
-    status: "bg-neutral-100/30",
+    status: "bg-[#EAE5DB]",
     notification: "bg-neutral-200",
     notificationText: "text-neutral-800"
   },
@@ -108,7 +108,7 @@ export default function Editor({
     muted: "text-neutral-500",
     border: "border-neutral-300",
     buttonHover: "hover:bg-neutral-200",
-    status: "bg-neutral-100/30",
+    status: "bg-[#FFFFFF]",
     notification: "bg-neutral-200",
     notificationText: "text-neutral-800"
   },
