@@ -665,12 +665,13 @@ const shareInviteLink = async (token) => {
               </div>
             )}
 
-
-            /* {message && (
+{/*
+            {message && (
               <p className="text-xs text-green-700">
                 {message}
               </p>
-            )} */
+            )}
+            */}
 
             {message && (
   <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
