@@ -2343,24 +2343,33 @@ return (
     "
   >
     {/* ----------------------------------------------- */}
-    {/* BREADCRUMB                                      */}
-    {/* ----------------------------------------------- */}
+{/* BREADCRUMB                                      */}
+{/* ----------------------------------------------- */}
 
-    <div className="min-w-0 flex-1">
-      <div className="min-w-0 flex items-center gap-2 text-xs text-neutral-500">
-        <span className="font-medium truncate">
-          {articleBreadcrumb}
-        </span>
+<div className="min-w-0 flex-1 overflow-hidden">
+  <div
+    className="
+      min-w-0
+      flex items-center gap-2
+      text-xs text-neutral-500
+      overflow-x-auto
+      whitespace-nowrap
+      scrollbar-none
+    "
+  >
+    <span className="font-medium shrink-0">
+      {articleBreadcrumb}
+    </span>
 
-        <span className="shrink-0">
-          &gt;
-        </span>
+    <span className="shrink-0">
+      &gt;
+    </span>
 
-        <span className="font-medium text-neutral-700 truncate">
-          {note.title || "Untitled"}
-        </span>
-      </div>
-    </div>
+    <span className="font-medium text-neutral-700 shrink-0">
+      {note.title || "Untitled"}
+    </span>
+  </div>
+</div>
 
     {/* ----------------------------------------------- */}
     {/* ACTIONS                                         */}
