@@ -6,8 +6,10 @@ import {
   sendPasswordResetEmail,
   onAuthStateChanged,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  deleteUser
 } from "firebase/auth";
+
 
 import {
   doc,
@@ -83,59 +85,14 @@ export const AuthProvider = ({ children }) => {
     normalizedInvite
   );
 
-  /*
-   * IMPORTANT:
-   *
-   * Claim the invite atomically BEFORE creating the
-   * Firebase account.
-   *
-   * This prevents two browsers from using the same
-   * invite at the same time.
-   */
-  const claimId =
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
-
-  await runTransaction(db, async (transaction) => {
-    const inviteSnap = await transaction.get(inviteRef);
-
-    if (!inviteSnap.exists()) {
-      throw new Error("Invalid invite token.");
-    }
-
-    const invite = inviteSnap.data();
-
-    if (invite.used === true) {
-      throw new Error(
-        "This invite token has already been used."
-      );
-    }
-
-    /*
-     * Mark it as claimed immediately.
-     *
-     * Because this happens inside a transaction,
-     * concurrent registration attempts cannot both
-     * successfully claim the same invite.
-     */
-    transaction.update(inviteRef, {
-      used: true,
-      claimId,
-      claimedAt: serverTimestamp(),
-      usedBy: null,
-      usedEmail: null,
-      usedAt: null
-    });
-  });
-
   let newUser = null;
 
   try {
     /*
-     * Firebase Auth itself prevents duplicate
-     * email/password accounts in the same project.
+     * Create the Firebase account first.
+     *
+     * This authenticates the user so Firestore rules
+     * can verify request.auth.uid when consuming the invite.
      */
     const userCredential =
       await createUserWithEmailAndPassword(
@@ -147,84 +104,83 @@ export const AuthProvider = ({ children }) => {
     newUser = userCredential.user;
 
     /*
-     * Finalize the invitation.
+     * Atomically consume the invitation.
+     *
+     * The Firestore transaction prevents two users
+     * from successfully consuming the same invite.
      */
-    await updateDoc(inviteRef, {
-      used: true,
-      claimId: null,
-      usedBy: newUser.uid,
-      usedEmail: normalizedEmail,
-      usedAt: serverTimestamp()
+    await runTransaction(db, async (transaction) => {
+      const inviteSnap =
+        await transaction.get(inviteRef);
+
+      if (!inviteSnap.exists()) {
+        throw new Error("Invalid invite token.");
+      }
+
+      const invite = inviteSnap.data();
+
+      if (invite.used === true) {
+        throw new Error(
+          "This invite token has already been used."
+        );
+      }
+
+      transaction.update(inviteRef, {
+        used: true,
+        status: "used",
+        claimId: null,
+        claimedAt: null,
+        usedBy: newUser.uid,
+        usedEmail: normalizedEmail,
+        usedAt: serverTimestamp()
+      });
     });
 
-  } catch (error) {
     /*
-     * If account creation definitely failed, release
-     * our claim so the invite can be used again.
-     *
-     * We only release the invite if there is no
-     * Firebase user from this registration attempt.
+     * Only derive the encryption key after the
+     * account and invite have both succeeded.
      */
-    if (!newUser) {
+    const derived = deriveMasterKey(
+      password,
+      newUser.uid
+    );
+
+    sessionStorage.setItem(
+      "scribe_session_aes_key",
+      derived
+    );
+
+    setMasterKey(derived);
+
+    return newUser;
+
+  } catch (error) {
+
+    /*
+     * If account creation succeeded but the invite
+     * could not be consumed, remove the newly-created
+     * Firebase account so the registration is rolled back.
+     */
+    if (newUser) {
       try {
-        await runTransaction(db, async (transaction) => {
-          const inviteSnap =
-            await transaction.get(inviteRef);
-
-          if (!inviteSnap.exists()) {
-            return;
-          }
-
-          const invite = inviteSnap.data();
-
-          /*
-           * Only release OUR claim.
-           *
-           * Never overwrite somebody else's claim.
-           */
-          if (
-            invite.used === true &&
-            invite.claimId === claimId
-          ) {
-            transaction.update(inviteRef, {
-              used: false,
-              claimId: null,
-              claimedAt: null,
-              usedBy: null,
-              usedEmail: null,
-              usedAt: null
-            });
-          }
-        });
-      } catch (releaseError) {
+        await deleteUser(newUser);
+      } catch (deleteError) {
         console.error(
-          "Failed to release invite claim:",
-          releaseError
+          "Failed to roll back Firebase account:",
+          deleteError
         );
       }
     }
 
     throw error;
   }
+};
+
 
   /*
    * Derive local encryption key from the same password
    * and Firebase UID used by the existing application.
    */
-  const derived = deriveMasterKey(
-    password,
-    newUser.uid
-  );
-
-  sessionStorage.setItem(
-    "scribe_session_aes_key",
-    derived
-  );
-
-  setMasterKey(derived);
-
-  return newUser;
-};
 
 
 
@@ -237,6 +193,61 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = (email) => {
     return sendPasswordResetEmail(auth, email);
   };
+
+  const login = async (email, password) => {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const credential = await signInWithEmailAndPassword(
+    auth,
+    normalizedEmail,
+    password
+  );
+
+  const derived = deriveMasterKey(
+    password,
+    credential.user.uid
+  );
+
+  sessionStorage.setItem(
+    "scribe_session_aes_key",
+    derived
+  );
+
+  setMasterKey(derived);
+
+  return credential.user;
+};
+
+const unlock = async (password) => {
+  if (!user) {
+    throw new Error("No authenticated user.");
+  }
+
+  const credential = EmailAuthProvider.credential(
+    user.email,
+    password
+  );
+
+  await reauthenticateWithCredential(
+    user,
+    credential
+  );
+
+  const derived = deriveMasterKey(
+    password,
+    user.uid
+  );
+
+  sessionStorage.setItem(
+    "scribe_session_aes_key",
+    derived
+  );
+
+  setMasterKey(derived);
+
+  return derived;
+};
+
 
   return (
     <AuthContext.Provider
