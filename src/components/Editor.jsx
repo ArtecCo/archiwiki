@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
 import { jsPDF } from "jspdf";
 import {
-  Eye,
   Edit,
   Save,
   BookOpen,
@@ -43,31 +42,33 @@ export default function Editor({
   const [pdfError, setPdfError] = useState(false);
 
   const textareaRef = useRef(null);
+  const fontSizeInitializedRef = useRef(false);
 
   /*
    * ---------------------------------------------------------
-   * FONT SIZE
+   * RESPONSIVE DEFAULT FONT SIZE
    * ---------------------------------------------------------
    *
-   * 15px is the desktop/laptop default.
-   * Small screens render 2px smaller while retaining the
-   * user's selected font-size value.
+   * Laptop / desktop: 15px
+   * Phone: 14px
    *
-   * The parent remains the source of truth when fontSize is
-   * already supplied.
+   * This only establishes the initial default. Existing
+   * font-size controls continue to work normally afterward.
    */
 
-  const numericFontSize = Number(fontSize);
+  useEffect(() => {
+    if (fontSizeInitializedRef.current) return;
 
-  const effectiveFontSize =
-    Number.isFinite(numericFontSize) && numericFontSize > 0
-      ? numericFontSize
-      : 15;
+    fontSizeInitializedRef.current = true;
 
-  const mobileFontSize = Math.max(
-    12,
-    effectiveFontSize - 2
-  );
+    if (typeof window === "undefined") return;
+
+    const isPhone = window.matchMedia(
+      "(max-width: 639px)"
+    ).matches;
+
+    setFontSize?.(isPhone ? 14 : 15);
+  }, [setFontSize]);
 
   /*
    * ---------------------------------------------------------
@@ -342,7 +343,10 @@ export default function Editor({
    * ---------------------------------------------------------
    */
 
-  const replaceSelection = (before, after = before) => {
+  const replaceSelection = (
+    before,
+    after = before
+  ) => {
     const textarea = textareaRef.current;
 
     if (!textarea) return;
@@ -583,7 +587,7 @@ export default function Editor({
 
   /*
    * ---------------------------------------------------------
-   * DIRECT PDF DOWNLOAD
+   * PDF DOWNLOAD
    * ---------------------------------------------------------
    */
 
@@ -615,9 +619,13 @@ export default function Editor({
         marginLeft -
         marginRight;
 
-      const footerY = pageHeight - 10;
+      const footerY =
+        pageHeight - 10;
+
       const bodyBottom =
-        pageHeight - bottom - 10;
+        pageHeight -
+        bottom -
+        10;
 
       let y = top;
       let pageNumber = 1;
@@ -631,11 +639,60 @@ export default function Editor({
         quote: [248, 248, 248]
       };
 
+      /*
+       * -----------------------------------------------------
+       * PDF UTILITY HELPERS
+       * -----------------------------------------------------
+       */
+
       const clean = (value) =>
         String(value || "")
           .replace(/\r\n/g, "\n")
           .replace(/\r/g, "\n")
           .replace(/\u00a0/g, " ");
+
+      /*
+       * Insert zero-width break opportunities into extremely
+       * long tokens such as URLs, hashes and long code strings.
+       *
+       * This does not visibly alter the exported text, but
+       * gives jsPDF safe places where a line can break.
+       */
+      const addSoftBreaks = (
+        value,
+        maxTokenLength = 42
+      ) => {
+        return String(value || "")
+          .split(/(\s+)/)
+          .map((part) => {
+            if (
+              /\s/.test(part) ||
+              part.length <= maxTokenLength
+            ) {
+              return part;
+            }
+
+            let result = "";
+
+            for (
+              let i = 0;
+              i < part.length;
+              i += 1
+            ) {
+              result += part[i];
+
+              if (
+                (i + 1) % maxTokenLength === 0 &&
+                i + 1 < part.length
+              ) {
+                result += "\u200B";
+              }
+            }
+
+            return result;
+          })
+          .join("");
+      };
 
       const plainInline = (value) =>
         clean(value)
@@ -652,7 +709,10 @@ export default function Editor({
             (_, target, label) =>
               label || target
           )
-          .replace(/`([^`]+)`/g, "$1")
+          .replace(
+            /`([^`]+)`/g,
+            "$1"
+          )
           .replace(
             /\*\*\*(.*?)\*\*\*/g,
             "$1"
@@ -686,11 +746,35 @@ export default function Editor({
         style = "normal",
         width = contentWidth
       ) => {
+        const prepared = addSoftBreaks(
+          plainInline(value)
+        );
+
         pdf.setFont(font, style);
         pdf.setFontSize(size);
 
         return pdf.splitTextToSize(
-          plainInline(value) || " ",
+          prepared || " ",
+          width
+        );
+      };
+
+      const wrapRaw = (
+        value,
+        size,
+        font = "times",
+        style = "normal",
+        width = contentWidth
+      ) => {
+        const prepared = addSoftBreaks(
+          clean(value)
+        );
+
+        pdf.setFont(font, style);
+        pdf.setFontSize(size);
+
+        return pdf.splitTextToSize(
+          prepared || " ",
           width
         );
       };
@@ -708,6 +792,12 @@ export default function Editor({
           yy
         );
       };
+
+      /*
+       * -----------------------------------------------------
+       * PDF FOOTER
+       * -----------------------------------------------------
+       */
 
       const pageFooter = () => {
         pdf.setDrawColor(...palette.rule);
@@ -731,6 +821,7 @@ export default function Editor({
         );
 
         pdf.setFontSize(7.5);
+
         pdf.setTextColor(
           ...palette.accent
         );
@@ -783,9 +874,11 @@ export default function Editor({
 
       const newPage = () => {
         pageFooter();
+
         pdf.addPage();
 
         pageNumber += 1;
+
         y = top;
       };
 
@@ -810,8 +903,13 @@ export default function Editor({
         style,
         lineHeight
       ) => {
-        pdf.setFont(font, style);
+        pdf.setFont(
+          font,
+          style
+        );
+
         pdf.setFontSize(size);
+
         pdf.setTextColor(
           ...palette.text
         );
@@ -835,7 +933,15 @@ export default function Editor({
         );
       };
 
-      const addParagraph = (value) => {
+      /*
+       * -----------------------------------------------------
+       * PDF BLOCK RENDERERS
+       * -----------------------------------------------------
+       */
+
+      const addParagraph = (
+        value
+      ) => {
         const text =
           plainInline(value);
 
@@ -954,7 +1060,8 @@ export default function Editor({
         level
       ) => {
         const indent =
-          Math.min(level, 4) * 5;
+          Math.min(level, 4) *
+          5;
 
         const marker = ordered
           ? `${number}.`
@@ -1114,14 +1221,19 @@ export default function Editor({
         y += boxHeight + 5;
       };
 
-      const addCode = (code) => {
+      const addCode = (
+        code
+      ) => {
         const size = 8.5;
         const lineHeight = 4.5;
 
         const allLines =
-          pdf.splitTextToSize(
+          wrapRaw(
             clean(code).trim() ||
               " ",
+            size,
+            "courier",
+            "normal",
             contentWidth - 10
           );
 
@@ -1142,7 +1254,9 @@ export default function Editor({
               )
             );
 
-          if (available <= 1) {
+          if (
+            available <= 1
+          ) {
             newPage();
             continue;
           }
@@ -1150,7 +1264,8 @@ export default function Editor({
           const chunk =
             allLines.slice(
               index,
-              index + available
+              index +
+                available
             );
 
           const boxHeight =
@@ -1197,8 +1312,11 @@ export default function Editor({
             }
           );
 
-          y += boxHeight + 5;
-          index += chunk.length;
+          y +=
+            boxHeight + 5;
+
+          index +=
+            chunk.length;
 
           if (
             index <
@@ -1212,7 +1330,8 @@ export default function Editor({
       const addTable = (
         rows
       ) => {
-        if (!rows.length) return;
+        if (!rows.length)
+          return;
 
         const cells = rows.map(
           (row) =>
@@ -1239,23 +1358,26 @@ export default function Editor({
           );
 
         const normalized =
-          cells.map((row) => {
-            const copy = [
-              ...row
-            ];
+          cells.map(
+            (row) => {
+              const copy = [
+                ...row
+              ];
 
-            while (
-              copy.length <
-              columnCount
-            ) {
-              copy.push("");
+              while (
+                copy.length <
+                columnCount
+              ) {
+                copy.push("");
+              }
+
+              return copy;
             }
-
-            return copy;
-          });
+          );
 
         if (
-          normalized.length >= 2 &&
+          normalized.length >=
+            2 &&
           normalized[1].every(
             (cell) =>
               /^:?-{3,}:?$/.test(
@@ -1269,7 +1391,9 @@ export default function Editor({
           );
         }
 
-        if (!normalized.length)
+        if (
+          !normalized.length
+        )
           return;
 
         const columnWidth =
@@ -1287,18 +1411,25 @@ export default function Editor({
           normalized.length
         ) {
           const row =
-            normalized[rowIndex];
+            normalized[
+              rowIndex
+            ];
 
           const cellLines =
-            row.map((cell) =>
-              pdf.splitTextToSize(
-                cell || " ",
-                Math.max(
-                  10,
-                  columnWidth -
-                    cellPadding * 2
+            row.map(
+              (cell) =>
+                pdf.splitTextToSize(
+                  addSoftBreaks(
+                    cell ||
+                      " "
+                  ),
+                  Math.max(
+                    10,
+                    columnWidth -
+                      cellPadding *
+                        2
+                  )
                 )
-              )
             );
 
           const rowHeight =
@@ -1307,7 +1438,8 @@ export default function Editor({
                 (lines) =>
                   lines.length *
                     lineHeight +
-                  cellPadding * 2
+                  cellPadding *
+                    2
               )
             );
 
@@ -1318,7 +1450,9 @@ export default function Editor({
             newPage();
           }
 
-          if (rowIndex === 0) {
+          if (
+            rowIndex === 0
+          ) {
             pdf.setFillColor(
               ...palette.soft
             );
@@ -1391,11 +1525,18 @@ export default function Editor({
           }
 
           y += rowHeight;
+
           rowIndex += 1;
         }
 
         y += 5;
       };
+
+      /*
+       * -----------------------------------------------------
+       * MARKDOWN PARSER
+       * -----------------------------------------------------
+       */
 
       const renderMarkdown = (
         markdown
@@ -1491,6 +1632,7 @@ export default function Editor({
             }
 
             addTable(rows);
+
             continue;
           }
 
@@ -1510,9 +1652,7 @@ export default function Editor({
           }
 
           if (
-            line.startsWith(
-              ">"
-            )
+            line.startsWith(">")
           ) {
             const values = [];
 
@@ -1523,9 +1663,7 @@ export default function Editor({
                 index
               ]
                 .trim()
-                .startsWith(
-                  ">"
-                )
+                .startsWith(">")
             ) {
               values.push(
                 lines[index]
@@ -1535,6 +1673,7 @@ export default function Editor({
             }
 
             addQuote(values);
+
             continue;
           }
 
@@ -1605,8 +1744,11 @@ export default function Editor({
             }
 
             rule();
+
             y += 5;
+
             index += 1;
+
             continue;
           }
 
@@ -1636,16 +1778,12 @@ export default function Editor({
               break;
 
             if (
-              /^```/.test(
-                next
-              )
+              /^```/.test(next)
             )
               break;
 
             if (
-              /^>/.test(
-                next
-              )
+              /^>/.test(next)
             )
               break;
 
@@ -1674,7 +1812,10 @@ export default function Editor({
               break;
             }
 
-            paragraph.push(next);
+            paragraph.push(
+              next
+            );
+
             index += 1;
           }
 
@@ -1685,14 +1826,28 @@ export default function Editor({
       };
 
       /*
-       * HEADER EXECUTION
+       * -----------------------------------------------------
+       * PDF BREADCRUMB
+       * -----------------------------------------------------
+       *
+       * IMPORTANT:
+       * The breadcrumb intentionally includes the article
+       * title as its final item.
+       *
+       * It replaces the old standalone "ArchiWiki" line
+       * above the article title.
        */
 
-      if (
-        typeof articleBreadcrumb !==
-          "undefined" &&
-        articleBreadcrumb
-      ) {
+      const pdfBreadcrumb =
+        [
+          articleBreadcrumb,
+          title ||
+            "Untitled Note"
+        ]
+          .filter(Boolean)
+          .join(" > ");
+
+      if (pdfBreadcrumb) {
         pdf.setFont(
           "helvetica",
           "normal"
@@ -1706,7 +1861,9 @@ export default function Editor({
 
         const breadcrumbLines =
           pdf.splitTextToSize(
-            articleBreadcrumb,
+            addSoftBreaks(
+              pdfBreadcrumb
+            ),
             contentWidth
           );
 
@@ -1725,8 +1882,14 @@ export default function Editor({
         y +=
           breadcrumbLines.length *
             4.2 +
-          3;
+          5;
       }
+
+      /*
+       * -----------------------------------------------------
+       * TITLE
+       * -----------------------------------------------------
+       */
 
       const titleLines = wrap(
         title ||
@@ -1758,10 +1921,13 @@ export default function Editor({
       y += titleHeight + 4;
 
       rule(y);
+
       y += 5;
 
       /*
-       * METADATA GRID EXECUTION
+       * -----------------------------------------------------
+       * METADATA GRID
+       * -----------------------------------------------------
        */
 
       const metadata = [
@@ -1770,12 +1936,7 @@ export default function Editor({
         `${metrics.paragraphs} Paragraphs`,
         `${metrics.headings} Headings`,
         `${metrics.wikiLinks} Wiki links`,
-        `Updated: ${
-          typeof updatedAtText !==
-          "undefined"
-            ? updatedAtText
-            : ""
-        }`
+        `Updated: ${updatedAtText}`
       ];
 
       const columns = 3;
@@ -1838,9 +1999,21 @@ export default function Editor({
         4;
 
       rule(y);
+
       y += 6;
 
+      /*
+       * -----------------------------------------------------
+       * BODY
+       * -----------------------------------------------------
+       */
+
       renderMarkdown(body);
+
+      /*
+       * Final footer.
+       */
+
       pageFooter();
 
       pdf.save(
@@ -1862,16 +2035,14 @@ export default function Editor({
   const sanitizeFilename = (
     value
   ) => {
-    return (
-      String(value)
-        .replace(
-          /[<>:"/\\|?*]/g,
-          "_"
-        )
-        .trim()
-        .substring(0, 150) ||
-      "Untitled Note"
-    );
+    return String(value)
+      .replace(
+        /[<>:"/\\|?*]/g,
+        "_"
+      )
+      .trim()
+      .substring(0, 150) ||
+      "Untitled Note";
   };
 
   /*
@@ -1881,28 +2052,38 @@ export default function Editor({
    */
 
   const calculateMetrics = () => {
-    const raw = String(body || "");
+    const raw = String(
+      body || ""
+    );
 
     const words = raw.trim()
-      ? raw.trim().split(/\s+/).length
+      ? raw
+          .trim()
+          .split(/\s+/)
+          .length
       : 0;
 
-    const characters = raw.length;
+    const characters =
+      raw.length;
 
     const paragraphs = raw
       .split(/\n\s*\n/)
-      .map((part) => part.trim())
+      .map((part) =>
+        part.trim()
+      )
       .filter(Boolean)
       .length;
 
     const headings = (
-      raw.match(/^#{1,6}\s+.+$/gm) ||
-      []
+      raw.match(
+        /^#{1,6}\s+.+$/gm
+      ) || []
     ).length;
 
     const wikiLinks = (
-      raw.match(/\[\[[^\]]+\]\]/g) ||
-      []
+      raw.match(
+        /\[\[[^\]]+\]\]/g
+      ) || []
     ).length;
 
     return {
@@ -1933,10 +2114,14 @@ export default function Editor({
       return "Unknown";
     }
 
-    let timestamp = Number(value);
+    let timestamp = Number(
+      value
+    );
 
     if (
-      !Number.isFinite(timestamp)
+      !Number.isFinite(
+        timestamp
+      )
     ) {
       return "Unknown";
     }
@@ -1981,12 +2166,25 @@ export default function Editor({
    * ---------------------------------------------------------
    * BREADCRUMB
    * ---------------------------------------------------------
+   *
+   * This is the canonical folder breadcrumb.
+   *
+   * Example:
+   * ArchiWiki > Projects > Website > Research
+   *
+   * The PDF separately appends the article title to this
+   * so its final breadcrumb becomes:
+   *
+   * ArchiWiki > Projects > Website > Research > Article
+   * ---------------------------------------------------------
    */
 
   const formatArticleBreadcrumb = (
     value
   ) => {
-    const parts = String(value || "")
+    const parts = String(
+      value || ""
+    )
       .split("/")
       .map((part) =>
         part.trim()
@@ -2035,7 +2233,11 @@ export default function Editor({
   if (!note) {
     return (
       <div
-        className={`h-full w-full flex items-center justify-center ${colors.page} font-montserrat px-4 sm:px-6 py-12 overflow-auto`}
+        className={`h-full w-full flex items-center justify-center ${colors.page} px-6 py-12`}
+        style={{
+          fontFamily:
+            "Montserrat, sans-serif"
+        }}
       >
         <div className="w-full max-w-2xl text-center">
           <BookOpen
@@ -2054,9 +2256,9 @@ export default function Editor({
             Glimpse of your digital brain
           </p>
 
-          <div className="mt-12 flex items-center justify-center overflow-x-auto max-w-full">
-            <div className="flex items-center min-w-max">
-              <div className="px-5 sm:px-6 md:px-10 text-center">
+          <div className="mt-12 flex items-center justify-center">
+            <div className="flex items-center">
+              <div className="px-6 md:px-10 text-center">
                 <div className="text-2xl md:text-3xl font-medium">
                   {articleCount}
                 </div>
@@ -2070,7 +2272,7 @@ export default function Editor({
                 className={`h-10 w-px ${colors.border}`}
               />
 
-              <div className="px-5 sm:px-6 md:px-10 text-center">
+              <div className="px-6 md:px-10 text-center">
                 <div className="text-2xl md:text-3xl font-medium">
                   {folderCount}
                 </div>
@@ -2084,7 +2286,7 @@ export default function Editor({
                 className={`h-10 w-px ${colors.border}`}
               />
 
-              <div className="px-5 sm:px-6 md:px-10 text-center">
+              <div className="px-6 md:px-10 text-center">
                 <div className="text-2xl md:text-3xl font-medium">
                   {subfolderCount}
                 </div>
@@ -2098,7 +2300,8 @@ export default function Editor({
 
           {writingSince && (
             <p className="mt-10 text-[10px] uppercase tracking-[0.2em] text-neutral-400">
-              Writing since {writingSince}
+              Writing since{" "}
+              {writingSince}
             </p>
           )}
         </div>
@@ -2113,602 +2316,616 @@ export default function Editor({
    */
 
   return (
-    <>
-      {/* Montserrat is intentionally scoped to this editor. */}
-      <style>{`
-        .archiwiki-editor,
-        .archiwiki-editor button,
-        .archiwiki-editor input,
-        .archiwiki-editor textarea {
-          font-family: Montserrat, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-
-        .archiwiki-editor .editor-prose,
-        .archiwiki-editor .editor-prose * {
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-
-        .archiwiki-editor textarea {
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-          word-break: normal;
-          overflow-x: hidden;
-        }
-
-        .archiwiki-editor .mobile-status-value {
-          min-width: 0;
-        }
-
-        @media (max-width: 639px) {
-          .archiwiki-editor .editor-main-font {
-            font-size: ${mobileFontSize}px !important;
-          }
-
-          .archiwiki-editor .editor-textarea {
-            font-size: ${mobileFontSize}px !important;
-          }
-        }
-
-        @media (min-width: 640px) {
-          .archiwiki-editor .editor-main-font {
-            font-size: ${effectiveFontSize}px !important;
-          }
-
-          .archiwiki-editor .editor-textarea {
-            font-size: ${effectiveFontSize}px !important;
-          }
-        }
-      `}</style>
+    <div
+      className={`flex-1 min-h-0 flex flex-col h-full ${colors.page}`}
+      style={{
+        fontFamily:
+          "Montserrat, sans-serif"
+      }}
+    >
+      {/* -------------------------------------------------- */}
+      {/* EDITOR CONTEXT MENU                                */}
+      {/* -------------------------------------------------- */}
 
       <div
-        className={`archiwiki-editor flex-1 min-h-0 min-w-0 flex flex-col h-full w-full overflow-hidden ${colors.page}`}
+        className={`flex items-center justify-between gap-3 border-b ${colors.border} px-6 py-3 max-md:px-3 ${colors.toolbar}`}
       >
-        {/* -------------------------------------------------- */}
-        {/* EDITOR CONTEXT MENU                                */}
-        {/* -------------------------------------------------- */}
+        <div className="min-w-0 flex-1 flex items-center gap-2 text-xs text-neutral-500">
+          <span className="font-medium truncate">
+            {articleBreadcrumb}
+          </span>
 
-        <div
-          className={`shrink-0 border-b ${colors.border} ${colors.toolbar} px-3 sm:px-4 md:px-6 py-2.5 sm:py-3`}
-        >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 min-w-0">
-            {/* Breadcrumb */}
+          <span className="shrink-0">
+            &gt;
+          </span>
 
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="flex items-center gap-2 text-[10px] sm:text-xs font-medium text-neutral-500 min-w-0">
-                <span className="truncate">
-                  {articleBreadcrumb}
-                </span>
-
-                <span className="shrink-0">
-                  &gt;
-                </span>
-
-                <span className="truncate text-neutral-700">
-                  {note.title ||
-                    "Untitled"}
-                </span>
-              </div>
-            </div>
-
-            {/* Controls */}
-
-            <div className="flex items-center justify-between sm:justify-end gap-2 md:gap-4 min-w-0">
-              {/* Font size */}
-
-              <div className="flex items-center gap-2 text-[10px] sm:text-xs shrink-0">
-                <span className="hidden xs:inline sm:inline">
-                  Size:
-                </span>
-
-                <input
-                  type="range"
-                  min="14"
-                  max="24"
-                  value={effectiveFontSize}
-                  onChange={(e) =>
-                    setFontSize(
-                      parseInt(
-                        e.target.value,
-                        10
-                      )
-                    )
-                  }
-                  aria-label="Editor font size"
-                  title="Editor font size"
-                  className="w-16 sm:w-20 md:w-24 accent-neutral-900 bg-neutral-200 h-1.5 rounded-lg cursor-pointer"
-                />
-
-                <span className="w-8 text-right">
-                  {effectiveFontSize}px
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {/* PDF */}
-
-                <button
-                  onClick={
-                    triggerPdfDownload
-                  }
-                  title="Download PDF"
-                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600 flex items-center gap-1 text-[10px] sm:text-xs`}
-                >
-                  <Download size={14} />
-                  <span>PDF</span>
-                </button>
-
-                {/* Edit / Save */}
-
-                <button
-                  onClick={async () => {
-                    if (isEditing) {
-                      await onSaveNote(
-                        note.id,
-                        title,
-                        body
-                      );
-
-                      setIsEditing(
-                        false
-                      );
-                    } else {
-                      enterEditMode();
-                    }
-                  }}
-                  className="py-1.5 px-2.5 sm:px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                >
-                  {isEditing ? (
-                    <>
-                      <Save size={12} />
-                      <span>Save</span>
-                    </>
-                  ) : (
-                    <>
-                      <Edit size={12} />
-                      <span>Edit</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={
-                    onCloseNote
-                  }
-                  title="Close article"
-                  aria-label="Close article"
-                  className={`p-1.5 ${colors.buttonHover} rounded text-neutral-500 hover:text-neutral-800 transition-colors`}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
+          <span className="font-medium text-neutral-700 truncate">
+            {note.title ||
+              "Untitled"}
+          </span>
         </div>
 
-        {/* -------------------------------------------------- */}
-        {/* WORKING DESK                                       */}
-        {/* -------------------------------------------------- */}
+        <div className="shrink-0 flex items-center gap-2 md:gap-4">
+          {/* Font size */}
 
-        <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
-          {/* ------------------------------------------------ */}
-          {/* MAIN WORKSPACE                                   */}
-          {/* ------------------------------------------------ */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="hidden sm:inline">
+              Size:
+            </span>
 
-          <div
-            className="editor-main-font flex-1 min-h-0 min-w-0 flex flex-col p-4 sm:p-5 md:p-8 overflow-y-auto overflow-x-hidden"
-          >
-            {isEditing ? (
-              <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3 sm:gap-4 relative">
-                {/* TITLE */}
-
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) =>
-                    setTitle(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Title your note"
-                  className={`w-full min-w-0 max-w-full bg-transparent border-b ${colors.border} pb-2 focus:outline-none focus:border-neutral-800 font-montserrat font-bold text-xl sm:text-2xl tracking-wide placeholder-neutral-300`}
-                />
-
-                {/* ------------------------------------------------ */}
-                {/* MARKDOWN TOOLBAR                                 */}
-                {/* ------------------------------------------------ */}
-
-                <div
-                  className={`shrink-0 flex items-center gap-1 border-b ${colors.border} pb-2 overflow-x-auto overflow-y-hidden max-w-full scrollbar-thin`}
-                >
-                  <button
-                    type="button"
-                    title="Bold"
-                    aria-label="Bold"
-                    onClick={() =>
-                      replaceSelection(
-                        "**",
-                        "**"
-                      )
-                    }
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <Bold size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Italic"
-                    aria-label="Italic"
-                    onClick={() =>
-                      replaceSelection(
-                        "*",
-                        "*"
-                      )
-                    }
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <Italic size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Heading"
-                    aria-label="Heading"
-                    onClick={
-                      applyHeading
-                    }
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <Heading
-                      size={14}
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Bulleted list"
-                    aria-label="Bulleted list"
-                    onClick={() =>
-                      applyList(false)
-                    }
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <List size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Numbered list"
-                    aria-label="Numbered list"
-                    onClick={() =>
-                      applyList(true)
-                    }
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <ListOrdered
-                      size={14}
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Quote"
-                    aria-label="Quote"
-                    onClick={() =>
-                      replaceSelection(
-                        "> ",
-                        ""
-                      )
-                    }
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <Quote size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Code"
-                    aria-label="Code"
-                    onClick={applyCode}
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <Code size={14} />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Link"
-                    aria-label="Link"
-                    onClick={applyLink}
-                    className={`shrink-0 p-1.5 ${colors.buttonHover} rounded text-neutral-600`}
-                  >
-                    <LinkIcon
-                      size={14}
-                    />
-                  </button>
-                </div>
-
-                {/* BODY */}
-
-                <textarea
-                  ref={textareaRef}
-                  value={body}
-                  onChange={
-                    handleTextareaChange
-                  }
-                  onKeyDown={
-                    handleKeyDown
-                  }
-                  wrap="soft"
-                  placeholder="Write your thoughts... Type '[[' to link pages."
-                  spellCheck="true"
-                  className={`editor-textarea flex-1 min-h-[240px] min-w-0 w-full max-w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed whitespace-pre-wrap break-words overflow-x-hidden overflow-y-auto ${colors.input}`}
-                />
-
-                {/* ------------------------------------------------ */}
-                {/* WIKI AUTOCOMPLETE                                */}
-                {/* ------------------------------------------------ */}
-
-                {wikiSuggest && (
-                  <div
-                    className={`absolute z-50 ${colors.dropdown} border ${colors.border} rounded shadow-lg p-1 w-64 max-w-[calc(100vw-2rem)] max-h-48 overflow-y-auto text-xs font-montserrat`}
-                    style={{
-                      top: `${wikiSuggest.pos.top}px`,
-                      left: `${wikiSuggest.pos.left}px`
-                    }}
-                  >
-                    <p className="px-2 py-1 text-[10px] text-neutral-400 uppercase font-bold tracking-wider">
-                      Connect note
-                    </p>
-
-                    {wikiSuggest.list.map(
-                      (
-                        item,
-                        idx
-                      ) => (
-                        <div
-                          key={
-                            item.id
-                          }
-                          onClick={() =>
-                            insertWikiLink(
-                              item.title
-                            )
-                          }
-                          className={`px-3 py-1.5 cursor-pointer rounded flex items-center gap-1.5 ${
-                            idx ===
-                            wikiSuggest.index
-                              ? `${colors.active} font-semibold`
-                              : colors.hover
-                          }`}
-                        >
-                          <FileText
-                            size={12}
-                          />
-
-                          <span className="truncate">
-                            {
-                              item.title
-                            }
-                          </span>
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* ------------------------------------------------ */
-              /* READING MODE                                    */
-              /* ------------------------------------------------ */
-
-              <div
-                id="print-container"
-                className="min-w-0 w-full max-w-full"
-                onClick={
-                  handleHtmlClick
-                }
-              >
-                <div className="editor-prose prose w-full max-w-4xl mr-auto font-montserrat leading-loose text-left break-words overflow-wrap-anywhere">
-                  <h1 className="text-2xl font-bold border-b border-neutral-300 pb-3 mb-5 tracking-wide break-words">
-                    {title ||
-                      "Untitled Note"}
-                  </h1>
-
-                  <div
-                    className={`min-w-0 max-w-full break-words overflow-wrap-anywhere ${
-                      theme ===
-                      "charcoal"
-                        ? "text-neutral-100"
-                        : "text-neutral-800"
-                    }`}
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        parseWikiLinks(
-                          body
-                        )
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* -------------------------------------------------- */}
-          {/* BACKLINK PANEL                                    */}
-          {/* -------------------------------------------------- */}
-
-          <div
-            className={`w-56 shrink-0 border-l ${colors.border} ${colors.sidebar} p-4 flex flex-col gap-4 text-xs font-montserrat max-lg:hidden`}
-          >
-            <h4 className="font-bold uppercase tracking-wider text-neutral-500 text-[10px]">
-              Backlinks ({backlinks.length})
-            </h4>
-
-            <div className="flex-1 overflow-y-auto space-y-2">
-              {backlinks.length >
-              0 ? (
-                backlinks.map(
-                  (backlink) => (
-                    <div
-                      key={
-                        backlink.id
-                      }
-                      onClick={() =>
-                        onNavigateToNote(
-                          backlink.id
-                        )
-                      }
-                      className={`p-2 border ${colors.border} ${colors.card} rounded cursor-pointer transition-colors ${colors.buttonHover}`}
-                    >
-                      <p
-                        className={`font-semibold truncate ${
-                          theme ===
-                          "charcoal"
-                            ? "text-neutral-100"
-                            : "text-neutral-900"
-                        }`}
-                      >
-                        {
-                          backlink.title
-                        }
-                      </p>
-
-                      <p className="text-[10px] text-neutral-500 truncate">
-                        {
-                          backlink.body
-                        }
-                      </p>
-                    </div>
+            <input
+              type="range"
+              min="12"
+              max="24"
+              value={
+                Number(fontSize) ||
+                15
+              }
+              onChange={(e) =>
+                setFontSize(
+                  parseInt(
+                    e.target.value,
+                    10
                   )
                 )
+              }
+              className="w-16 sm:w-20 accent-neutral-900 bg-neutral-200 h-1 rounded-lg cursor-pointer"
+              aria-label="Font size"
+            />
+
+            <span className="w-8 text-right">
+              {Number(fontSize) ||
+                15}
+              px
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* PDF */}
+
+            <button
+              onClick={
+                triggerPdfDownload
+              }
+              title="Download PDF"
+              className={`p-1.5 ${colors.buttonHover} rounded text-neutral-600 flex items-center gap-1 text-xs`}
+            >
+              <Download size={14} />
+
+              <span className="hidden sm:inline">
+                PDF
+              </span>
+            </button>
+
+            {/* Edit / Save */}
+
+            <button
+              onClick={async () => {
+                if (isEditing) {
+                  await onSaveNote(
+                    note.id,
+                    title,
+                    body
+                  );
+
+                  setIsEditing(false);
+                } else {
+                  enterEditMode();
+                }
+              }}
+              className="py-1 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              {isEditing ? (
+                <>
+                  <Save size={12} />
+
+                  <span>Save</span>
+                </>
               ) : (
-                <p className="text-neutral-400 italic">
-                  No connections
-                  link here yet.
-                </p>
+                <>
+                  <Edit size={12} />
+
+                  <span>Edit</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onCloseNote}
+              title="Close article"
+              aria-label="Close article"
+              className={`p-1.5 ${colors.buttonHover} rounded text-neutral-500 hover:text-neutral-800 transition-colors`}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* -------------------------------------------------- */}
+      {/* WORKING DESK                                       */}
+      {/* -------------------------------------------------- */}
+
+      <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden">
+        {/* ------------------------------------------------ */}
+        {/* MAIN WORKSPACE                                   */}
+        {/* ------------------------------------------------ */}
+
+        <div
+          className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden"
+          style={{
+            fontSize: `${Number(
+              fontSize || 15
+            )}px`
+          }}
+        >
+          {isEditing ? (
+            <div className="flex-1 min-h-0 flex flex-col gap-4 relative">
+              {/* TITLE */}
+
+              <input
+                type="text"
+                value={title}
+                onChange={(e) =>
+                  setTitle(
+                    e.target.value
+                  )
+                }
+                placeholder="Title your note"
+                className={`w-full min-w-0 bg-transparent border-b ${colors.border} pb-2 focus:outline-none focus:border-neutral-800 font-bold text-2xl tracking-wide placeholder-neutral-300`}
+              />
+
+              {/* ------------------------------------------------ */}
+              {/* MARKDOWN TOOLBAR                                 */}
+              {/* ------------------------------------------------ */}
+
+              <div
+                className={`flex items-center gap-1 border-b ${colors.border} pb-2 overflow-x-auto shrink-0`}
+              >
+                <button
+                  type="button"
+                  title="Bold"
+                  onClick={() =>
+                    replaceSelection(
+                      "**",
+                      "**"
+                    )
+                  }
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Bold size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  title="Italic"
+                  onClick={() =>
+                    replaceSelection(
+                      "*",
+                      "*"
+                    )
+                  }
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Italic
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Heading"
+                  onClick={
+                    applyHeading
+                  }
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Heading
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Bulleted list"
+                  onClick={() =>
+                    applyList(false)
+                  }
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <List size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  title="Numbered list"
+                  onClick={() =>
+                    applyList(true)
+                  }
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <ListOrdered
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Quote"
+                  onClick={() =>
+                    replaceSelection(
+                      "> ",
+                      ""
+                    )
+                  }
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Quote
+                    size={14}
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  title="Code"
+                  onClick={applyCode}
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <Code size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  title="Link"
+                  onClick={applyLink}
+                  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+                >
+                  <LinkIcon
+                    size={14}
+                  />
+                </button>
+              </div>
+
+              {/* BODY */}
+
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={
+                  handleTextareaChange
+                }
+                onKeyDown={
+                  handleKeyDown
+                }
+                wrap="soft"
+                placeholder="Write your thoughts... Type '[[' to link pages."
+                className={`flex-1 min-h-0 min-w-0 w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed whitespace-pre-wrap break-words ${colors.input}`}
+                style={{
+                  overflowX: "hidden",
+                  overflowY: "auto",
+                  overflowWrap:
+                    "anywhere",
+                  wordBreak:
+                    "break-word",
+                  whiteSpace:
+                    "pre-wrap"
+                }}
+              />
+
+              {/* ------------------------------------------------ */}
+              {/* WIKI AUTOCOMPLETE                                */}
+              {/* ------------------------------------------------ */}
+
+              {wikiSuggest && (
+                <div
+                  className={`absolute z-50 ${colors.dropdown} border ${colors.border} rounded shadow-lg p-1 w-64 max-w-[calc(100vw-2rem)] max-h-48 overflow-y-auto text-xs`}
+                  style={{
+                    top: `${wikiSuggest.pos.top}px`,
+                    left: `${wikiSuggest.pos.left}px`
+                  }}
+                >
+                  <p className="px-2 py-1 text-[10px] text-neutral-400 uppercase font-bold tracking-wider">
+                    Connect note
+                  </p>
+
+                  {wikiSuggest.list.map(
+                    (item, idx) => (
+                      <div
+                        key={item.id}
+                        onClick={() =>
+                          insertWikiLink(
+                            item.title
+                          )
+                        }
+                        className={`px-3 py-1.5 cursor-pointer rounded flex items-center gap-1.5 ${
+                          idx ===
+                          wikiSuggest.index
+                            ? `${colors.active} font-semibold`
+                            : colors.hover
+                        }`}
+                      >
+                        <FileText
+                          size={12}
+                        />
+
+                        <span className="truncate">
+                          {item.title}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </div>
               )}
             </div>
-          </div>
+          ) : (
+            /* ------------------------------------------------ */
+            /* READING MODE                                    */
+            /* ------------------------------------------------ */
+
+            <div
+              id="print-container"
+              className="min-w-0 w-full"
+              onClick={
+                handleHtmlClick
+              }
+            >
+              <div
+                className="prose w-full max-w-4xl mr-auto font-serif leading-loose text-left"
+                style={{
+                  minWidth: 0,
+                  maxWidth: "100%",
+                  overflowWrap:
+                    "anywhere",
+                  wordBreak:
+                    "break-word"
+                }}
+              >
+                <h1 className="max-w-full text-2xl font-bold border-b border-neutral-300 pb-3 mb-5 tracking-wide break-words">
+                  {title ||
+                    "Untitled Note"}
+                </h1>
+
+                <div
+                  className={`min-w-0 max-w-full ${
+                    theme === "charcoal"
+                      ? "text-neutral-100"
+                      : "text-neutral-800"
+                  }`}
+                  style={{
+                    overflowWrap:
+                      "anywhere",
+                    wordBreak:
+                      "break-word",
+                    whiteSpace:
+                      "normal"
+                  }}
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      parseWikiLinks(
+                        body
+                      )
+                  }}
+                />
+              </div>
+
+              {/* 
+               * Force wrapping on every generated Markdown
+               * element. This is deliberately scoped to the
+               * article viewer so it cannot affect the rest
+               * of the application.
+               */}
+              <style>
+                {`
+                  #print-container,
+                  #print-container * {
+                    min-width: 0;
+                    max-width: 100%;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                  }
+
+                  #print-container pre,
+                  #print-container code {
+                    white-space: pre-wrap;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                    max-width: 100%;
+                  }
+
+                  #print-container table {
+                    width: 100%;
+                    max-width: 100%;
+                    table-layout: fixed;
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                  }
+
+                  #print-container td,
+                  #print-container th {
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                  }
+
+                  #print-container img {
+                    max-width: 100%;
+                    height: auto;
+                  }
+
+                  #print-container a {
+                    overflow-wrap: anywhere;
+                    word-break: break-word;
+                  }
+                `}
+              </style>
+            </div>
+          )}
         </div>
 
         {/* -------------------------------------------------- */}
-        {/* STATUS BAR                                         */}
+        {/* BACKLINK PANEL                                    */}
         {/* -------------------------------------------------- */}
 
         <div
-          className={`shrink-0 border-t ${colors.border} ${colors.status} px-3 sm:px-4 md:px-6 py-2 font-montserrat text-[10px] sm:text-[11px] text-neutral-500`}
+          className={`w-56 border-l ${colors.border} ${colors.sidebar} p-4 flex flex-col gap-4 text-xs font-sans max-lg:hidden`}
         >
-          <div className="flex flex-col gap-1.5 sm:gap-2">
-            {/* Statistics */}
+          <h4 className="font-bold uppercase tracking-wider text-neutral-500 text-[10px]">
+            Backlinks (
+            {backlinks.length})
+          </h4>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
-              <span className="whitespace-nowrap">
-                Words:{" "}
-                <strong>
-                  {words}
-                </strong>
-              </span>
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {backlinks.length >
+            0 ? (
+              backlinks.map(
+                (backlink) => (
+                  <div
+                    key={
+                      backlink.id
+                    }
+                    onClick={() =>
+                      onNavigateToNote(
+                        backlink.id
+                      )
+                    }
+                    className={`p-2 border ${colors.border} ${colors.card} rounded cursor-pointer transition-colors ${colors.buttonHover}`}
+                  >
+                    <p
+                      className={`font-semibold truncate ${
+                        theme ===
+                        "charcoal"
+                          ? "text-neutral-100"
+                          : "text-neutral-900"
+                      }`}
+                    >
+                      {
+                        backlink.title
+                      }
+                    </p>
 
-              <span className="whitespace-nowrap">
-                Characters:{" "}
-                <strong>
-                  {characters}
-                </strong>
-              </span>
+                    <p className="text-[10px] text-neutral-500 truncate">
+                      {
+                        backlink.body
+                      }
+                    </p>
+                  </div>
+                )
+              )
+            ) : (
+              <p className="text-neutral-400 italic">
+                No connections link
+                here yet.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
 
-              <span className="whitespace-nowrap">
-                Paragraphs:{" "}
-                <strong>
-                  {paragraphs}
-                </strong>
-              </span>
+      {/* -------------------------------------------------- */}
+      {/* STATUS BAR                                         */}
+      {/* -------------------------------------------------- */}
 
-              <span className="whitespace-nowrap">
-                Headings:{" "}
-                <strong>
-                  {headings}
-                </strong>
-              </span>
+      <div
+        className={`border-t ${colors.border} ${colors.status} px-6 py-1.5 flex justify-between items-center gap-4 text-[11px] font-sans text-neutral-500 overflow-hidden`}
+      >
+        <div className="min-w-0 flex gap-4 overflow-x-auto whitespace-nowrap">
+          <span>
+            Words:{" "}
+            <strong>
+              {words}
+            </strong>
+          </span>
 
-              <span className="whitespace-nowrap">
-                Wiki Links:{" "}
-                <strong>
-                  {wikiLinks}
-                </strong>
-              </span>
-            </div>
+          <span>
+            Characters:{" "}
+            <strong>
+              {characters}
+            </strong>
+          </span>
 
-            {/* Status / Updated */}
+          <span>
+            Paragraphs:{" "}
+            <strong>
+              {paragraphs}
+            </strong>
+          </span>
 
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
-              <span className="whitespace-nowrap">
-                Updated:{" "}
-                <strong>
-                  {updatedAtText}
-                </strong>
-              </span>
+          <span>
+            Headings:{" "}
+            <strong>
+              {headings}
+            </strong>
+          </span>
 
-              <span className="whitespace-nowrap">
-                Status:{" "}
-                <strong
-                  className={
-                    theme ===
-                    "charcoal"
-                      ? "text-neutral-100"
-                      : "text-neutral-700"
-                  }
-                >
-                  Encrypted AES-256
-                </strong>
-              </span>
+          <span>
+            Wiki Links:{" "}
+            <strong>
+              {wikiLinks}
+            </strong>
+          </span>
+        </div>
+
+        <div className="hidden sm:flex shrink-0 gap-4 whitespace-nowrap">
+          <span>
+            Updated:{" "}
+            <strong>
+              {updatedAtText}
+            </strong>
+          </span>
+
+          <span>
+            Status:{" "}
+            <strong
+              className={
+                theme ===
+                "charcoal"
+                  ? "text-neutral-100"
+                  : "text-neutral-700"
+              }
+            >
+              Encrypted AES-256
+            </strong>
+          </span>
+        </div>
+      </div>
+
+      {pdfError && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pdf-error-title"
+        >
+          <div
+            className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme}`}
+          >
+            <h2
+              id="pdf-error-title"
+              className="text-base font-semibold"
+            >
+              PDF export failed
+            </h2>
+
+            <p className="mt-2 text-sm text-neutral-500">
+              The PDF could not be
+              created. Please try
+              again.
+            </p>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() =>
+                  setPdfError(false)
+                }
+                className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
-
-        {pdfError && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pdf-error-title"
-          >
-            <div
-              className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme}`}
-            >
-              <h2
-                id="pdf-error-title"
-                className="text-base font-semibold"
-              >
-                PDF export failed
-              </h2>
-
-              <p className="mt-2 text-sm text-neutral-500">
-                The PDF could not
-                be created. Please
-                try again.
-              </p>
-
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPdfError(
-                      false
-                    )
-                  }
-                  className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+      )}
+    </div>
   );
 }
