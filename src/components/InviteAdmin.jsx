@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+
 import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
@@ -18,6 +19,7 @@ import {
 
 import { auth, db } from "../firebase";
 
+
 const generateInviteCode = () => {
   const alphabet =
     "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -31,6 +33,27 @@ const generateInviteCode = () => {
   ).join("");
 };
 
+
+/*
+ * Prevent Firestore from keeping the admin page
+ * stuck forever if the request never resolves.
+ */
+const withTimeout = (promise, timeoutMs = 8000) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            "The administrator access check timed out. Please check your Firebase connection and Firestore rules."
+          )
+        );
+      }, timeoutMs);
+    })
+  ]);
+};
+
+
 export default function InviteAdmin() {
   const [user, setUser] = useState(null);
   const [authorized, setAuthorized] = useState(false);
@@ -40,125 +63,120 @@ export default function InviteAdmin() {
   const [password, setPassword] = useState("");
 
   const [invites, setInvites] = useState([]);
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
   const [creating, setCreating] = useState(false);
+  const [loggingIn, setLoggingIn] = useState(false);
+
 
   /*
-   * Check whether the currently authenticated Firebase
-   * user exists in adminUsers/{uid} and is active.
+   * Firebase Auth listener.
    *
-   * This deliberately checks auth.currentUser immediately
-   * instead of waiting indefinitely for the auth listener.
+   * This component deliberately handles its own authentication.
+   * It does NOT depend on AuthContext.
    */
   useEffect(() => {
     let mounted = true;
 
-    const checkAdminAccess = async (currentUser) => {
-      if (!mounted) return;
-
-      setUser(currentUser);
-
-      /*
-       * No authenticated Firebase user.
-       * Stop checking immediately and show login.
-       */
-      if (!currentUser) {
-        setAuthorized(false);
-        setCheckingAccess(false);
-        return;
-      }
-
-      try {
-        const adminRef = doc(
-          db,
-          "adminUsers",
-          currentUser.uid
-        );
-
-        /*
-         * Prevent the admin page from remaining on the
-         * loading screen forever if Firestore is unavailable.
-         */
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => {
-            reject(
-              new Error(
-                "Administrator access check timed out."
-              )
-            );
-          }, 10000);
-        });
-
-        const adminSnap = await Promise.race([
-          getDoc(adminRef),
-          timeoutPromise
-        ]);
-
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentUser) => {
         if (!mounted) return;
 
-        const isAdmin =
-          adminSnap.exists() &&
-          adminSnap.data()?.active === true;
-
-        setAuthorized(isAdmin);
+        setUser(currentUser);
+        setAuthorized(false);
+        setError("");
 
         /*
-         * If the authenticated Firebase account exists
-         * but is not an active administrator, sign it out.
+         * No authenticated user.
+         *
+         * We can immediately show the admin login.
          */
-        if (!isAdmin) {
-          await signOut(auth);
+        if (!currentUser) {
+          setCheckingAccess(false);
+          return;
+        }
+
+        /*
+         * Authenticated user exists.
+         *
+         * Now verify that the user's UID exists in:
+         *
+         * adminUsers/{uid}
+         *
+         * and that:
+         *
+         * active === true
+         */
+        try {
+          const adminRef = doc(
+            db,
+            "adminUsers",
+            currentUser.uid
+          );
+
+          const adminSnap = await withTimeout(
+            getDoc(adminRef),
+            8000
+          );
 
           if (!mounted) return;
 
-          setUser(null);
+          if (
+            adminSnap.exists() &&
+            adminSnap.data()?.active === true
+          ) {
+            setAuthorized(true);
+            setError("");
+          } else {
+            setAuthorized(false);
+
+            /*
+             * The Firebase account exists, but is not
+             * an administrator.
+             */
+            setError(
+              "This Firebase account is not authorized as an administrator."
+            );
+
+            /*
+             * Remove the authenticated session so that
+             * the login screen is shown cleanly.
+             */
+            try {
+              await signOut(auth);
+            } catch (signOutError) {
+              console.error(
+                "Failed to sign out unauthorized user:",
+                signOutError
+              );
+            }
+
+            if (!mounted) return;
+
+            setUser(null);
+          }
+        } catch (err) {
+          console.error(
+            "Failed to check administrator access:",
+            err
+          );
+
+          if (!mounted) return;
+
           setAuthorized(false);
-        }
-      } catch (err) {
-        console.error(
-          "Failed to check admin access:",
-          err
-        );
 
-        if (!mounted) return;
-
-        setAuthorized(false);
-
-        if (
-          err?.message ===
-          "Administrator access check timed out."
-        ) {
           setError(
-            "Unable to connect to Firebase. Please check your connection and try again."
+            err?.message ||
+              "Unable to verify administrator access."
           );
-        } else {
-          setError(
-            "Unable to verify administrator access. Check your Firestore rules."
-          );
+        } finally {
+          if (mounted) {
+            setCheckingAccess(false);
+          }
         }
-      } finally {
-        if (mounted) {
-          setCheckingAccess(false);
-        }
-      }
-    };
-
-    /*
-     * IMPORTANT:
-     * Check the current Firebase user immediately.
-     * This prevents the page from depending entirely
-     * on the auth-state callback firing before rendering.
-     */
-    checkAdminAccess(auth.currentUser);
-
-    /*
-     * Continue watching authentication changes.
-     */
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (currentUser) => {
-        checkAdminAccess(currentUser);
       }
     );
 
@@ -168,8 +186,10 @@ export default function InviteAdmin() {
     };
   }, []);
 
+
   /*
-   * Load invitations only after authorization.
+   * Load invitations only after administrator access
+   * has been confirmed.
    */
   useEffect(() => {
     if (!authorized) {
@@ -182,7 +202,7 @@ export default function InviteAdmin() {
       orderBy("createdAt", "desc")
     );
 
-    return onSnapshot(
+    const unsubscribe = onSnapshot(
       invitesQuery,
       (snapshot) => {
         setInvites(
@@ -191,6 +211,11 @@ export default function InviteAdmin() {
             ...item.data()
           }))
         );
+
+        /*
+         * Clear an old error if the query succeeds.
+         */
+        setError("");
       },
       (err) => {
         console.error(
@@ -199,11 +224,15 @@ export default function InviteAdmin() {
         );
 
         setError(
-          "Unable to load invitations. Check Firestore rules."
+          err?.message ||
+            "Unable to load invitations. Check Firestore rules."
         );
       }
     );
+
+    return unsubscribe;
   }, [authorized]);
+
 
   /*
    * Administrator login.
@@ -211,21 +240,40 @@ export default function InviteAdmin() {
   const handleLogin = async (event) => {
     event.preventDefault();
 
+    if (loggingIn) return;
+
     setError("");
     setMessage("");
+    setLoggingIn(true);
 
     try {
+      const normalizedEmail =
+        email.trim().toLowerCase();
+
+      if (!normalizedEmail) {
+        throw new Error(
+          "Please enter your email address."
+        );
+      }
+
+      if (!password) {
+        throw new Error(
+          "Please enter your password."
+        );
+      }
+
       const credential =
         await signInWithEmailAndPassword(
           auth,
-          email.trim().toLowerCase(),
+          normalizedEmail,
           password
         );
 
       /*
-       * Verify the authenticated Firebase UID against:
+       * Explicitly check the admin document here.
        *
-       * adminUsers/{uid}
+       * This gives the login action a direct result instead
+       * of depending only on the Auth state listener.
        */
       const adminRef = doc(
         db,
@@ -233,17 +281,23 @@ export default function InviteAdmin() {
         credential.user.uid
       );
 
-      const adminSnap = await getDoc(adminRef);
+      const adminSnap = await withTimeout(
+        getDoc(adminRef),
+        8000
+      );
 
-      const isAdmin =
-        adminSnap.exists() &&
-        adminSnap.data()?.active === true;
-
-      if (!isAdmin) {
+      if (!adminSnap.exists()) {
         await signOut(auth);
 
-        setUser(null);
-        setAuthorized(false);
+        throw new Error(
+          "Administrator record not found. Create adminUsers/" +
+            credential.user.uid +
+            " in Firestore."
+        );
+      }
+
+      if (adminSnap.data()?.active !== true) {
+        await signOut(auth);
 
         throw new Error(
           "This account is not authorized as an administrator."
@@ -251,76 +305,73 @@ export default function InviteAdmin() {
       }
 
       /*
-       * The auth listener will also see this user,
-       * but explicitly update state here so the UI
-       * does not have to wait for another auth event.
+       * Successful login.
+       *
+       * The onAuthStateChanged listener will also run,
+       * but the access check above guarantees that we do
+       * not wait indefinitely for it.
        */
       setUser(credential.user);
       setAuthorized(true);
-      setCheckingAccess(false);
 
       setEmail("");
       setPassword("");
+      setError("");
+      setMessage("Administrator access granted.");
     } catch (err) {
       console.error(
         "Admin login failed:",
         err
       );
 
-      setAuthorized(false);
-      setCheckingAccess(false);
-
-      if (
-        err?.code === "auth/invalid-credential" ||
-        err?.code === "auth/wrong-password"
-      ) {
-        setError("Incorrect email or password.");
-      } else if (
-        err?.code === "auth/user-not-found"
-      ) {
-        setError("No account exists with this email.");
-      } else if (
-        err?.code === "auth/invalid-email"
-      ) {
-        setError("Please enter a valid email address.");
-      } else {
-        setError(
-          err?.message ||
+      setError(
+        err?.message ||
           "Unable to sign in."
-        );
-      }
+      );
+    } finally {
+      setLoggingIn(false);
     }
   };
 
+
   /*
-   * Create a new single-use invitation.
+   * Create invitation.
    */
   const createInvite = async () => {
+    if (!user || !authorized) {
+      setError(
+        "You are not authorized to create invitations."
+      );
+      return;
+    }
+
+    if (creating) return;
+
     setError("");
     setMessage("");
     setCreating(true);
 
     try {
-      if (!user) {
-        throw new Error(
-          "You must be signed in as an administrator."
-        );
-      }
-
       const token = generateInviteCode();
 
       await setDoc(
         doc(db, "pendingInvites", token),
         {
           token,
+
           status: "available",
+
           used: false,
+
           claimId: null,
           claimedAt: null,
+
           usedBy: null,
           usedEmail: null,
           usedAt: null,
+
           createdAt: serverTimestamp(),
+
           createdBy: user.uid
         }
       );
@@ -336,15 +387,16 @@ export default function InviteAdmin() {
 
       setError(
         err?.message ||
-        "Unable to create invitation."
+          "Unable to create invitation."
       );
     } finally {
       setCreating(false);
     }
   };
 
+
   /*
-   * Copy invitation token.
+   * Copy invitation.
    */
   const copyInvite = async (token) => {
     try {
@@ -353,47 +405,106 @@ export default function InviteAdmin() {
       setMessage(
         `Copied ${token}`
       );
-    } catch {
+
+      setError("");
+    } catch (err) {
+      console.error(
+        "Unable to copy invitation:",
+        err
+      );
+
       setError(
         "Unable to copy the invitation."
       );
     }
   };
 
+
   /*
-   * Format Firestore timestamps.
+   * Sign out.
+   */
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+
+      setUser(null);
+      setAuthorized(false);
+      setInvites([]);
+
+      setEmail("");
+      setPassword("");
+
+      setMessage("");
+      setError("");
+    } catch (err) {
+      console.error(
+        "Admin sign out failed:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to sign out."
+      );
+    }
+  };
+
+
+  /*
+   * Firestore Timestamp formatter.
    */
   const formatDate = (value) => {
     if (!value) return "—";
 
-    const date =
-      typeof value.toDate === "function"
-        ? value.toDate()
-        : new Date(value);
+    try {
+      const date =
+        typeof value.toDate === "function"
+          ? value.toDate()
+          : new Date(value);
 
-    return date.toLocaleString();
+      if (Number.isNaN(date.getTime())) {
+        return "—";
+      }
+
+      return date.toLocaleString();
+    } catch {
+      return "—";
+    }
   };
 
+
   /*
-   * Loading state.
+   * INITIAL ACCESS CHECK
    */
   if (checkingAccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB]">
-        <p className="text-sm text-neutral-500">
-          Checking administrator access…
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] p-6">
+        <div className="w-full max-w-sm bg-white border border-neutral-300 rounded shadow-md p-7 text-center">
+          <h1 className="text-xl font-bold">
+            ArchiWiki Administration
+          </h1>
+
+          <p className="text-xs text-neutral-500 mt-3">
+            Checking administrator access…
+          </p>
+
+          <p className="text-[11px] text-neutral-400 mt-2">
+            This check will time out if Firebase is unreachable.
+          </p>
+        </div>
       </div>
     );
   }
 
+
   /*
-   * Login screen.
+   * LOGIN SCREEN
    */
   if (!user || !authorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] p-6">
         <div className="w-full max-w-sm bg-white border border-neutral-300 rounded shadow-md p-7">
+
           <h1 className="text-xl font-bold text-center">
             ArchiWiki Administration
           </h1>
@@ -406,6 +517,7 @@ export default function InviteAdmin() {
             onSubmit={handleLogin}
             className="space-y-4"
           >
+
             <div>
               <label className="block text-xs font-semibold mb-1">
                 Email
@@ -422,6 +534,7 @@ export default function InviteAdmin() {
                 className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"
               />
             </div>
+
 
             <div>
               <label className="block text-xs font-semibold mb-1">
@@ -440,32 +553,51 @@ export default function InviteAdmin() {
               />
             </div>
 
+
             {error && (
-              <p className="text-xs text-red-600">
-                {error}
+              <div className="p-3 bg-red-50 border border-red-200 rounded">
+                <p className="text-xs text-red-700">
+                  {error}
+                </p>
+              </div>
+            )}
+
+
+            {message && (
+              <p className="text-xs text-green-700">
+                {message}
               </p>
             )}
 
+
             <button
               type="submit"
-              className="w-full py-2 bg-neutral-900 text-white rounded text-sm font-semibold"
+              disabled={loggingIn}
+              className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-sm font-semibold disabled:opacity-50"
             >
-              Sign in
+              {loggingIn
+                ? "Signing in…"
+                : "Sign in"}
             </button>
+
           </form>
+
         </div>
       </div>
     );
   }
 
+
   /*
-   * Authorized administrator interface.
+   * ADMIN DASHBOARD
    */
   return (
     <div className="min-h-screen bg-[#F5F2EB] text-neutral-900 p-6">
+
       <div className="max-w-5xl mx-auto">
 
         <div className="flex items-center justify-between mb-8">
+
           <div>
             <h1 className="text-2xl font-bold">
               Invitation Manager
@@ -477,19 +609,17 @@ export default function InviteAdmin() {
           </div>
 
           <button
-            onClick={async () => {
-              await signOut(auth);
-              setUser(null);
-              setAuthorized(false);
-              setCheckingAccess(false);
-            }}
+            onClick={handleSignOut}
             className="text-xs text-neutral-500 hover:text-neutral-900"
           >
             Sign out
           </button>
+
         </div>
 
+
         <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+
           <h2 className="font-semibold mb-2">
             Create invitation
           </h2>
@@ -508,68 +638,109 @@ export default function InviteAdmin() {
               : "Generate Invite"}
           </button>
 
+
           {message && (
             <p className="mt-4 text-xs text-green-700">
               {message}
             </p>
           )}
 
+
           {error && (
             <p className="mt-4 text-xs text-red-600">
               {error}
             </p>
           )}
+
         </div>
 
+
         <div className="bg-white border border-neutral-300 rounded overflow-hidden">
+
           <div className="p-5 border-b border-neutral-200">
+
             <h2 className="font-semibold">
               Invitations
             </h2>
 
             <p className="text-xs text-neutral-500 mt-1">
               {invites.length} invitation
-              {invites.length === 1 ? "" : "s"}
+              {invites.length === 1
+                ? ""
+                : "s"}
             </p>
+
           </div>
 
+
           {invites.length === 0 ? (
+
             <div className="p-8 text-center text-sm text-neutral-500">
               No invitations yet.
             </div>
+
           ) : (
+
             <div className="overflow-x-auto">
+
               <table className="w-full text-xs">
+
                 <thead>
                   <tr className="border-b border-neutral-200 text-left">
-                    <th className="p-4">Code</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4">Created</th>
-                    <th className="p-4">Used by</th>
-                    <th className="p-4">Used at</th>
+
+                    <th className="p-4">
+                      Code
+                    </th>
+
+                    <th className="p-4">
+                      Status
+                    </th>
+
+                    <th className="p-4">
+                      Created
+                    </th>
+
+                    <th className="p-4">
+                      Used by
+                    </th>
+
+                    <th className="p-4">
+                      Used at
+                    </th>
+
                     <th className="p-4"></th>
+
                   </tr>
                 </thead>
 
+
                 <tbody>
+
                   {invites.map((invite) => {
+
                     const status =
                       invite.status ||
-                      (invite.used
-                        ? "used"
-                        : "available");
+                      (
+                        invite.used
+                          ? "used"
+                          : "available"
+                      );
+
 
                     return (
                       <tr
                         key={invite.id}
                         className="border-b border-neutral-100"
                       >
+
                         <td className="p-4 font-mono">
                           {invite.token ||
                             invite.id}
                         </td>
 
+
                         <td className="p-4">
+
                           <span
                             className={
                               status === "used"
@@ -581,7 +752,9 @@ export default function InviteAdmin() {
                           >
                             {status}
                           </span>
+
                         </td>
+
 
                         <td className="p-4 text-neutral-500">
                           {formatDate(
@@ -589,10 +762,12 @@ export default function InviteAdmin() {
                           )}
                         </td>
 
+
                         <td className="p-4">
                           {invite.usedEmail ||
                             "—"}
                         </td>
+
 
                         <td className="p-4 text-neutral-500">
                           {formatDate(
@@ -600,7 +775,9 @@ export default function InviteAdmin() {
                           )}
                         </td>
 
+
                         <td className="p-4">
+
                           {status !== "used" && (
                             <button
                               onClick={() =>
@@ -614,16 +791,26 @@ export default function InviteAdmin() {
                               Copy
                             </button>
                           )}
+
                         </td>
+
                       </tr>
                     );
+
                   })}
+
                 </tbody>
+
               </table>
+
             </div>
+
           )}
+
         </div>
+
       </div>
+
     </div>
   );
 }
