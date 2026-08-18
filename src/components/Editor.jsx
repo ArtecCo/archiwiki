@@ -2825,12 +2825,13 @@ export default function Editor({
 {/* -------------------------------------------------- */}
 
 <div
-  className={`relative z-30 shrink-0 w-full min-h-[52px] max-md:min-h-[68px] border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
+  className={`fixed left-0 right-0 bottom-0 z-[9999] w-full border-t ${colors.border} ${colors.status} font-sans text-[11px] text-neutral-500`}
   style={{
-    boxSizing: "border-box",
     paddingBottom:
       "max(16px, env(safe-area-inset-bottom, 0px))",
-    flexShrink: 0
+    minHeight:
+      "calc(52px + max(16px, env(safe-area-inset-bottom, 0px)))",
+    boxSizing: "border-box"
   }}
 >
   <div
