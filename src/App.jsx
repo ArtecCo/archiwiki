@@ -220,13 +220,30 @@ const handleAuthSubmit = async (e) => {
       err
     );
 
-    setError(
-      err?.code === "auth/wrong-password" ||
-      err?.code === "auth/invalid-credential"
-        ? "Incorrect password."
-        : err?.message ||
-          "Authentication failed. Please try again."
-    );
+    if (err?.code === "auth/email-already-in-use") {
+  setError(
+    "An account with this email already exists."
+  );
+} else if (
+  err?.code === "auth/invalid-email"
+) {
+  setError("Please enter a valid email address.");
+} else if (
+  err?.code === "auth/weak-password"
+) {
+  setError("Please choose a stronger password.");
+} else if (
+  err?.code === "auth/wrong-password" ||
+  err?.code === "auth/invalid-credential"
+) {
+  setError("Incorrect password.");
+} else {
+  setError(
+    err?.message ||
+      "Authentication failed. Please try again."
+  );
+}
+
   } finally {
     // Never retain authentication credentials in React state.
     setEmail("");
