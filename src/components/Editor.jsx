@@ -2317,7 +2317,7 @@ export default function Editor({
 
   return (
     <div
-      className={`flex-1 min-h-0 min-w-0 h-[100dvh] max-h-[100dvh] overflow-hidden flex flex-col ${colors.page}`}
+      className={`flex-1 min-h-0 flex flex-col h-full ${colors.page}`}
       style={{
         fontFamily:
           "Montserrat, sans-serif"
@@ -2820,7 +2820,6 @@ export default function Editor({
           </div>
         </div>
       </div>
-
 {/* -------------------------------------------------- */}
 {/* STATUS BAR                                         */}
 {/* -------------------------------------------------- */}
