@@ -13,6 +13,7 @@ import {
   where 
 } from "firebase/firestore";
 import { encryptData, decryptData } from "./crypto";
+import InviteAdmin from "./components/InviteAdmin";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import GraphView from "./components/GraphView";
