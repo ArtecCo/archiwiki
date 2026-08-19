@@ -148,7 +148,7 @@ body {
 /* Wiki links */
 
 .wiki-content .wiki-link {
-  color: #2563eb;
+  color: #2E8B57;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
@@ -157,7 +157,7 @@ body {
 }
 
 .wiki-content .wiki-link:hover {
-  color: #1d4ed8;
+  color: #246B45;
 }
 
 .wiki-content .wiki-link-missing {
