@@ -17,3 +17,183 @@ body,
 body {
   font-family: "Montserrat", system-ui, sans-serif;
 }
+
+
+// Classes for spacing and links fix
+
+/* ---------------------------------------------------------
+   MARKDOWN READING VIEW
+   --------------------------------------------------------- */
+
+.wiki-content {
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.75;
+}
+
+.wiki-content p {
+  margin: 0 0 1.15rem;
+}
+
+.wiki-content p:last-child {
+  margin-bottom: 0;
+}
+
+.wiki-content h1,
+.wiki-content h2,
+.wiki-content h3,
+.wiki-content h4,
+.wiki-content h5,
+.wiki-content h6 {
+  font-family: Montserrat, system-ui, sans-serif;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.wiki-content h1 {
+  font-size: 1.8rem;
+}
+
+.wiki-content h2 {
+  font-size: 1.5rem;
+}
+
+.wiki-content h3 {
+  font-size: 1.25rem;
+}
+
+.wiki-content h4,
+.wiki-content h5,
+.wiki-content h6 {
+  font-size: 1.1rem;
+}
+
+.wiki-content ul,
+.wiki-content ol {
+  margin: 0 0 1.15rem;
+  padding-left: 1.75rem;
+}
+
+.wiki-content ul {
+  list-style-type: disc;
+}
+
+.wiki-content ol {
+  list-style-type: decimal;
+}
+
+.wiki-content li {
+  margin: 0.3rem 0;
+}
+
+.wiki-content li > ul,
+.wiki-content li > ol {
+  margin-top: 0.3rem;
+  margin-bottom: 0.3rem;
+}
+
+.wiki-content blockquote {
+  margin: 1.25rem 0;
+  padding: 0.5rem 1rem;
+  border-left: 4px solid #a3a3a3;
+  color: #737373;
+  font-style: italic;
+}
+
+.wiki-content pre {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.wiki-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.wiki-content hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: 1px solid #d4d4d4;
+}
+
+.wiki-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem 0;
+}
+
+.wiki-content table {
+  width: 100%;
+  margin: 1.25rem 0;
+  border-collapse: collapse;
+}
+
+.wiki-content th,
+.wiki-content th,
+.wiki-content td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d4d4d4;
+  text-align: left;
+}
+
+.wiki-content th {
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Wiki links */
+
+.wiki-content .wiki-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.wiki-content .wiki-link:hover {
+  color: #1d4ed8;
+}
+
+.wiki-content .wiki-link-missing {
+  color: #737373;
+  text-decoration: none;
+  cursor: default;
+}
+
+/* Dark theme */
+
+.dark .wiki-content .wiki-link {
+  color: #93c5fd;
+}
+
+.dark .wiki-content .wiki-link:hover {
+  color: #bfdbfe;
+}
+
+.dark .wiki-content blockquote {
+  color: #a3a3a3;
+  border-left-color: #525252;
+}
+
+.dark .wiki-content pre {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dark .wiki-content th,
+.dark .wiki-content td {
+  border-color: #525252;
+}
+
+.dark .wiki-content th {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dark .wiki-content hr {
+  border-top-color: #525252;
+}
