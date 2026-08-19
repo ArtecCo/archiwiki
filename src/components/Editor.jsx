@@ -531,61 +531,74 @@ export default function Editor({
    */
 
   const parseWikiLinks = (rawMarkdown) => {
-    const renderedHtml =
-      marked.parse(rawMarkdown || "");
+  const wikiLinks = [];
 
-    return renderedHtml.replace(
-      /\[\[(.*?)\]\]/g,
-      (match, linkedTitle) => {
-        const matchNote =
-          notesPool.find(
-            (n) =>
-              n.title
-                ?.trim()
-                .toLowerCase() ===
-              linkedTitle
-                ?.trim()
-                .toLowerCase()
-          );
+  // Protect [[wikilinks]] before marked parses the Markdown.
+  const protectedMarkdown = String(rawMarkdown || "").replace(
+    /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+    (_, target, label) => {
+      const index = wikiLinks.length;
 
-        if (matchNote) {
-          return `
-            <span
-              class="wiki-link underline cursor-pointer font-semibold"
-              data-note-id="${matchNote.id}"
-            >
-              ${linkedTitle}
-            </span>
-          `;
-        }
+      wikiLinks.push({
+        target: target.trim(),
+        label: (label || target).trim()
+      });
 
+      return `WIKILINKPLACEHOLDER${index}WIKILINKPLACEHOLDER`;
+    }
+  );
+
+  let renderedHtml = marked.parse(protectedMarkdown);
+
+  // Turn the protected placeholders back into wiki links.
+  renderedHtml = renderedHtml.replace(
+    /WIKILINKPLACEHOLDER(\d+)WIKILINKPLACEHOLDER/g,
+    (_, index) => {
+      const wikiLink = wikiLinks[Number(index)];
+
+      if (!wikiLink) return "";
+
+      const matchNote = notesPool.find(
+        (n) =>
+          n.title?.trim().toLowerCase() ===
+          wikiLink.target.toLowerCase()
+      );
+
+      if (!matchNote) {
         return `
-          <span class="text-neutral-400 line-through">
-            ${linkedTitle}
+          <span class="wiki-link-missing">
+            ${wikiLink.label}
           </span>
         `;
       }
-    );
-  };
+
+      return `
+        <span
+          class="wiki-link underline cursor-pointer font-semibold"
+          data-note-id="${matchNote.id}"
+        >
+          ${wikiLink.label}
+        </span>
+      `;
+    }
+  );
+
+  return renderedHtml;
+};
 
   const handleHtmlClick = (e) => {
-    const target = e.target;
+  const target = e.target.closest?.(".wiki-link");
 
-    if (
-      target.classList.contains(
-        "wiki-link"
-      )
-    ) {
-      const targetId =
-        target.getAttribute(
-          "data-note-id"
-        );
+  if (!target) return;
 
-      if (targetId) {
-        onNavigateToNote(targetId);
-      }
-    }
-  };
+  e.preventDefault();
+
+  const targetId = target.getAttribute("data-note-id");
+
+  if (targetId) {
+    onNavigateToNote(targetId);
+  }
+};
 
   /*
    * ---------------------------------------------------------
@@ -2729,7 +2742,7 @@ return (
             onClick={handleHtmlClick}
           >
             <div
-              className="prose w-full max-w-4xl mr-auto font-serif leading-loose text-left"
+              className="wiki-content w-full max-w-4xl mr-auto font-serif leading-loose text-left"
               style={{
                 minWidth: 0,
                 maxWidth: "100%",
