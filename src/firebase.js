@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { 
-  getFirestore, 
-  enableIndexedDbPersistence 
+  getFirestore
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
@@ -26,12 +25,12 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // Enable Firestore Offline Persistence for seamless offline/airplane writing
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn("Multiple tabs open; offline persistence enabled in primary tab only.");
-  } else if (err.code === 'unimplemented') {
-    console.warn("The current browser does not support offline persistence.");
-  }
-});
+// enableIndexedDbPersistence(db).catch((err) => {
+//   if (err.code === 'failed-precondition') {
+//     console.warn("Multiple tabs open; offline persistence enabled in primary tab only.");
+//   } else if (err.code === 'unimplemented') {
+//     console.warn("The current browser does not support offline persistence.");
+//   }
+// });
 
 export { db, auth };
