@@ -16,8 +16,10 @@ import {
   Quote,
   Code,
   Link as LinkIcon,
-  Trash2
+  Trash2,
+  Table2
 } from "lucide-react";
+import MarkdownEditor from "./MarkdownEditor";
 
 export default function Editor({
   note,
@@ -42,6 +44,11 @@ export default function Editor({
 
   const [wikiSuggest, setWikiSuggest] = useState(null);
   const [pdfError, setPdfError] = useState(false);
+
+  const [showTableDialog, setShowTableDialog] = useState(false);
+const [tableRows, setTableRows] = useState(3);
+const [tableColumns, setTableColumns] = useState(3);
+const [tableHeader, setTableHeader] = useState(true);
 
   const textareaRef = useRef(null);
   const fontSizeInitializedRef = useRef(false);
@@ -2602,7 +2609,8 @@ return (
                 type="button"
                 title="Bold"
                 onClick={() =>
-                  replaceSelection("**", "**")
+  textareaRef.current?.toggleBold()
+}
                 }
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
@@ -2613,7 +2621,8 @@ return (
                 type="button"
                 title="Italic"
                 onClick={() =>
-                  replaceSelection("*", "*")
+  textareaRef.current?.toggleItalic()
+}
                 }
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
@@ -2623,7 +2632,9 @@ return (
               <button
                 type="button"
                 title="Heading"
-                onClick={applyHeading}
+                onClick={() =>
+  textareaRef.current?.toggleHeading(2)
+}
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
                 <Heading size={14} />
@@ -2632,7 +2643,9 @@ return (
               <button
                 type="button"
                 title="Bulleted list"
-                onClick={() => applyList(false)}
+               onClick={() =>
+  textareaRef.current?.toggleBulletList()
+}
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
                 <List size={14} />
@@ -2641,7 +2654,9 @@ return (
               <button
                 type="button"
                 title="Numbered list"
-                onClick={() => applyList(true)}
+                onClick={() =>
+  textareaRef.current?.toggleOrderedList()
+}
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
                 <ListOrdered size={14} />
@@ -2651,8 +2666,8 @@ return (
                 type="button"
                 title="Quote"
                 onClick={() =>
-                  replaceSelection("> ", "")
-                }
+  textareaRef.current?.toggleBlockquote()
+}
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
                 <Quote size={14} />
@@ -2661,11 +2676,22 @@ return (
               <button
                 type="button"
                 title="Code"
-                onClick={applyCode}
+                onClick={() =>
+  textareaRef.current?.toggleCode()
+}
                 className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
               >
                 <Code size={14} />
               </button>
+
+      <button
+  type="button"
+  title="Insert table"
+  onClick={() => setShowTableDialog(true)}
+  className={`p-1.5 shrink-0 ${colors.buttonHover} rounded text-neutral-600`}
+>
+  <Table2 size={14} />
+</button>
 
               <button
                 type="button"
@@ -2679,22 +2705,15 @@ return (
 
             {/* BODY */}
 
-            <textarea
-              ref={textareaRef}
-              value={body}
-              onChange={handleTextareaChange}
-              onKeyDown={handleKeyDown}
-              wrap="soft"
-              placeholder="Write your thoughts... Type '[[' to link pages."
-              className={`flex-1 min-h-0 min-w-0 w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed whitespace-pre-wrap break-words ${colors.input}`}
-              style={{
-                overflowX: "hidden",
-                overflowY: "auto",
-                overflowWrap: "anywhere",
-                wordBreak: "break-word",
-                whiteSpace: "pre-wrap"
-              }}
-            />
+            <MarkdownEditor
+  ref={textareaRef}
+  value={body}
+  onChange={setBody}
+  placeholder="Write your thoughts... Type '[[' to link pages."
+  theme={theme}
+  editable={isEditing}
+  className={`flex-1 min-h-0 min-w-0 w-full ${colors.input}`}
+/>
 
             {/* WIKI AUTOCOMPLETE */}
 
@@ -2945,6 +2964,152 @@ return (
     </div>
   </div>
 </div>
+
+
+{showTableDialog && (
+  <div
+    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="table-dialog-title"
+    onMouseDown={(e) => {
+      if (e.target === e.currentTarget) {
+        setShowTableDialog(false);
+      }
+    }}
+  >
+    <div
+      className={`w-full max-w-sm rounded border p-5 shadow-xl ${dialogTheme}`}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <h2
+        id="table-dialog-title"
+        className="text-base font-semibold"
+      >
+        Insert table
+      </h2>
+
+      <p className="mt-1 text-xs text-neutral-500">
+        Choose the size of your table.
+      </p>
+
+      <div className="mt-5 grid grid-cols-2 gap-4">
+        <label className="text-sm">
+          <span className="block mb-1 text-xs text-neutral-500">
+            Rows
+          </span>
+
+          <input
+            type="number"
+            min="1"
+            max="50"
+            value={tableRows}
+            onChange={(e) =>
+              setTableRows(
+                Math.max(
+                  1,
+                  Math.min(
+                    50,
+                    Number(e.target.value) || 1
+                  )
+                )
+              )
+            }
+            className={`
+              w-full rounded border px-2 py-1.5
+              bg-transparent
+              focus:outline-none
+              ${colors.border}
+            `}
+          />
+        </label>
+
+        <label className="text-sm">
+          <span className="block mb-1 text-xs text-neutral-500">
+            Columns
+          </span>
+
+          <input
+            type="number"
+            min="1"
+            max="20"
+            value={tableColumns}
+            onChange={(e) =>
+              setTableColumns(
+                Math.max(
+                  1,
+                  Math.min(
+                    20,
+                    Number(e.target.value) || 1
+                  )
+                )
+              )
+            }
+            className={`
+              w-full rounded border px-2 py-1.5
+              bg-transparent
+              focus:outline-none
+              ${colors.border}
+            `}
+          />
+        </label>
+      </div>
+
+      <label className="mt-4 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={tableHeader}
+          onChange={(e) =>
+            setTableHeader(e.target.checked)
+          }
+        />
+
+        <span>Include header row</span>
+      </label>
+
+      <div className="mt-6 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            setShowTableDialog(false)
+          }
+          className={`
+            px-3 py-1.5
+            rounded
+            text-xs
+            ${colors.buttonHover}
+          `}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            textareaRef.current?.insertTable(
+              tableRows,
+              tableColumns,
+              tableHeader
+            );
+
+            setShowTableDialog(false);
+          }}
+          className="
+            px-3 py-1.5
+            rounded
+            bg-neutral-900
+            hover:bg-neutral-800
+            text-white
+            text-xs
+            font-semibold
+          "
+        >
+          Insert
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
     {/* -------------------------------------------------- */}
     {/* PDF ERROR DIALOG                                   */}
