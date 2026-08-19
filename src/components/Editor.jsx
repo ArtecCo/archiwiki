@@ -548,7 +548,10 @@ export default function Editor({
     }
   );
 
-  let renderedHtml = marked.parse(protectedMarkdown);
+  // Now Markdown can safely parse the rest of the document.
+let renderedHtml = marked.parse(protectedMarkdown, {
+  breaks: true
+});
 
   // Turn the protected placeholders back into wiki links.
   renderedHtml = renderedHtml.replace(
