@@ -2263,7 +2263,7 @@ let renderedHtml = marked.parse(protectedMarkdown, {
 
   if (mobilePanel && mobileReaderPanel === "structure") {
     return (
-      <div className={`h-full overflow-y-auto px-4 py-5 ${colors.page}`}>
+      <div className={`h-full overflow-y-auto structure-tree-scrollbar px-4 py-5 ${colors.page}`}>
         <div className="max-w-2xl mx-auto">
           <h2 className="text-sm font-semibold uppercase tracking-wider mb-4">
             Structure
@@ -2306,7 +2306,7 @@ let renderedHtml = marked.parse(protectedMarkdown, {
 
   if (mobilePanel && mobileReaderPanel === "links") {
     return (
-      <div className={`h-full overflow-y-auto px-4 py-5 ${colors.page}`}>
+      <div className={`h-full overflow-y-auto structure-tree-scrollbar px-4 py-5 ${colors.page}`}>
         <div className="max-w-2xl mx-auto">
           <h2 className="text-sm font-semibold uppercase tracking-wider mb-4">
             Backlinks ({backlinks.length})
