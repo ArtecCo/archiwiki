@@ -1075,7 +1075,7 @@ function ArchiWikiApp() {
               <span className="md:hidden">Graph</span>
             </button>
 
-            <div className="md:hidden flex items-center gap-1 ml-auto">
+<div className="md:hidden flex items-center gap-1 ml-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -1108,23 +1108,6 @@ function ArchiWikiApp() {
               >
                 <Link2 size={13} />
                 <span>Links</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("graph");
-                  setMobileReaderPanel("graph");
-                }}
-                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
-                  activeTab === "graph" && mobileReaderPanel === "graph"
-                    ? shellTheme.tabActive
-                    : shellTheme.tabIdle
-                }`}
-                aria-label="Open graph"
-              >
-                <Network size={13} />
-                <span>Graph</span>
               </button>
             </div>
           </div>
@@ -1192,41 +1175,6 @@ function ArchiWikiApp() {
         <div className="flex-1 overflow-hidden">
           {activeTab === "editor" ? (
             <div className="h-full min-h-0 flex flex-col">
-              <div className="md:hidden shrink-0 border-b px-3 py-1.5 flex items-center gap-1 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => setMobileReaderPanel("structure")}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                    mobileReaderPanel === "structure"
-                      ? shellTheme.tabActive
-                      : shellTheme.tabIdle
-                  }`}
-                >
-                  Structure
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileReaderPanel("links")}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                    mobileReaderPanel === "links"
-                      ? shellTheme.tabActive
-                      : shellTheme.tabIdle
-                  }`}
-                >
-                  Links
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMobileReaderPanel("graph")}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold ${
-                    mobileReaderPanel === "graph"
-                      ? shellTheme.tabActive
-                      : shellTheme.tabIdle
-                  }`}
-                >
-                  Graph
-                </button>
-              </div>
               <div className="flex-1 min-h-0">
             <Editor
   theme={theme}
