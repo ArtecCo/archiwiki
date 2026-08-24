@@ -2566,7 +2566,7 @@ return (
     {/* WORKING DESK                                       */}
     {/* -------------------------------------------------- */}
 
-    <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden pb-[58px] md:pb-0">
+    <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden pb-[48px] md:pb-0">
 
       {/* ------------------------------------------------ */}
       {/* MAIN WORKSPACE                                   */}
@@ -2878,21 +2878,21 @@ return (
     shrink-0
     border-t ${colors.border}
     ${colors.status}
-    font-sans text-[11px] text-neutral-500
+    font-sans text-[10px] md:text-[11px] text-neutral-500
   `}
   style={{
     paddingBottom:
       "env(safe-area-inset-bottom)"
   }}
 >
-  <div className="w-full overflow-x-auto">
+  <div className="metrics-scrollbar w-full overflow-x-auto">
     <div
       className="
         min-w-max
-        px-4 py-2.5
+        px-3 py-1.5
         md:px-6 md:py-1.5
         flex items-center justify-between
-        gap-8
+        gap-4 md:gap-8
         whitespace-nowrap
       "
     >
