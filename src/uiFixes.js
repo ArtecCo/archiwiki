@@ -13,13 +13,12 @@ const injectScrollbarStyles = () => {
   const style = document.createElement("style");
   style.id = "archiwiki-thin-scrollbar-fix";
   style.textContent = `
-    /* The actual editor is a textarea; the viewer is print-container/wiki-content. */
     textarea,
     #print-container,
     #print-container .wiki-content,
     .wiki-content {
       scrollbar-width: thin;
-      scrollbar-color: rgba(46,139,87,.55) transparent;
+      scrollbar-color: #000 transparent;
     }
     textarea::-webkit-scrollbar,
     #print-container::-webkit-scrollbar,
@@ -38,15 +37,15 @@ const injectScrollbarStyles = () => {
     #print-container::-webkit-scrollbar-thumb,
     #print-container .wiki-content::-webkit-scrollbar-thumb,
     .wiki-content::-webkit-scrollbar-thumb {
-      background: rgba(46,139,87,.55);
+      background: #000;
       border-radius: 999px;
-      min-height: 24px;
+      min-height: 22px;
     }
     textarea::-webkit-scrollbar-thumb:hover,
     #print-container::-webkit-scrollbar-thumb:hover,
     #print-container .wiki-content::-webkit-scrollbar-thumb:hover,
     .wiki-content::-webkit-scrollbar-thumb:hover {
-      background: rgba(46,139,87,.72);
+      background: #000;
     }
   `;
   document.head.appendChild(style);
@@ -75,11 +74,16 @@ const collectHeadings = (source) => {
     }).filter(Boolean);
   }
 
-  return Array.from(source.root.querySelectorAll("h1,h2,h3,h4,h5,h6")).map((heading) => ({
-    level: Number(heading.tagName.slice(1)),
-    title: heading.textContent.replace(/\s+/g, " ").trim(),
-    element: heading
-  })).filter((item) => item.title);
+  // In view mode the note title is rendered separately as the first H1.
+  // Structure must start with the note's actual markdown headings, just like Edit mode.
+  const contentRoot = source.root.querySelector(".wiki-content") || source.root;
+  return Array.from(contentRoot.querySelectorAll("h1,h2,h3,h4,h5,h6"))
+    .map((heading) => ({
+      level: Number(heading.tagName.slice(1)),
+      title: heading.textContent.replace(/\s+/g, " ").trim(),
+      element: heading
+    }))
+    .filter((item) => item.title);
 };
 
 const renderStructure = () => {
@@ -147,20 +151,35 @@ const renderStructure = () => {
   container.appendChild(list);
 };
 
-const restoreCurrentFolder = () => {
-  const activeNote = document.querySelector(".archiwiki-sidebar-item .lucide-file-text")?.closest(".archiwiki-sidebar-item");
-  if (!activeNote) return;
+const isCollapsedFolderHeader = (element) =>
+  !!element?.querySelector("svg.lucide-chevron-right");
 
-  let folder = activeNote.parentElement?.parentElement;
-  while (folder) {
-    const header = folder.firstElementChild;
-    const chevron = header?.querySelector("svg.lucide-chevron-right");
-    if (chevron) {
+const findActiveNote = () => {
+  const candidates = Array.from(document.querySelectorAll(".archiwiki-sidebar-item"));
+  return candidates.find((item) => {
+    if (!item.querySelector("svg.lucide-file-text")) return false;
+    return /bg-\[#[^\]]+\]|bg-neutral-200|bg-neutral-800/.test(item.className);
+  }) || null;
+};
+
+const restoreCurrentFolder = () => {
+  const activeNote = findActiveNote();
+  if (!activeNote) return false;
+
+  let node = activeNote.parentElement;
+  let opened = false;
+
+  while (node && node.id !== "root") {
+    const header = node.firstElementChild;
+    if (header && isCollapsedFolderHeader(header)) {
       header.click();
-      return;
+      opened = true;
+      break;
     }
-    folder = folder.parentElement;
+    node = node.parentElement;
   }
+
+  return opened;
 };
 
 const startUiFixes = () => {
@@ -168,11 +187,22 @@ const startUiFixes = () => {
   injectScrollbarStyles();
 
   let scheduled = false;
+  let restoreAttempts = 0;
+  let lastStructureSignature = "";
+
   const refresh = () => {
     scheduled = false;
     renderStructure();
-    restoreCurrentFolder();
+
+    const opened = restoreCurrentFolder();
+    if (opened) {
+      restoreAttempts = 0;
+    } else if (restoreAttempts < 12) {
+      restoreAttempts += 1;
+      setTimeout(() => schedule(), 80);
+    }
   };
+
   const schedule = () => {
     if (scheduled) return;
     scheduled = true;
@@ -182,7 +212,20 @@ const startUiFixes = () => {
   schedule();
   const root = document.getElementById("root");
   if (root) {
-    const observer = new MutationObserver(schedule);
+    const observer = new MutationObserver(() => {
+      const editor = document.querySelector("textarea");
+      const viewer = document.getElementById("print-container");
+      const structure = editor?.value || viewer?.innerText || "";
+      const signature = `${structure.length}:${structure.slice(0, 300)}:${editor ? "edit" : "view"}`;
+
+      if (signature !== lastStructureSignature) {
+        lastStructureSignature = signature;
+        schedule();
+      } else {
+        // Sidebar/folder rendering can change without changing note content.
+        schedule();
+      }
+    });
     observer.observe(root, { childList: true, subtree: true, characterData: true });
   }
 };
