@@ -79,6 +79,7 @@ const [newInviteToken, setNewInviteToken] = useState("");
   const [notificationPriority, setNotificationPriority] = useState("low");
   const [notificationIcon, setNotificationIcon] = useState("Bell");
   const [notificationSaving, setNotificationSaving] = useState(false);
+  const notificationIconComponents = { Bell, Megaphone, Info, AlertTriangle, AlertCircle };
   const notificationRef = doc(db, "adminMetrics", "notification");
 
   const maintenanceRef = doc(db, "adminMetrics", "maintenance");
@@ -987,66 +988,62 @@ const shareInviteLink = async (token) => {
         </div>
 
 
-        <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
-          <h2 className="font-semibold mb-2">User notification</h2>
-          <p className="text-xs text-neutral-500 mb-4">
-            Show a read-only notification card above the folders and files for every user.
-          </p>
-
-          <label className="flex items-center gap-3 text-sm mb-4 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={notificationEnabled}
-              onChange={(e) => setNotificationEnabled(e.target.checked)}
-              className="h-4 w-4"
-            />
-            Enable notification
-          </label>
+        <div className="bg-white border border-neutral-300 rounded p-4 sm:p-6 mb-6 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-semibold mb-1">User notification</h2>
+              <p className="text-xs text-neutral-500">
+                Show a read-only announcement or warning to all users.
+              </p>
+            </div>
+            <label className="flex shrink-0 items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={notificationEnabled} onChange={(e) => setNotificationEnabled(e.target.checked)} className="h-4 w-4" />
+              Enable
+            </label>
+          </div>
 
           <textarea
             value={notificationContent}
             onChange={(e) => setNotificationContent(e.target.value)}
             rows={3}
             maxLength={500}
-            placeholder="Maintenance message for users…"
-            className="w-full border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
+            placeholder="Write your announcement or warning…"
+            className="mt-4 w-full max-w-full box-border border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
           />
 
-          <div className="mt-3 flex items-center gap-3">
-            <label className="text-xs text-neutral-500">Icon</label>
-            <select
-              value={notificationIcon}
-              onChange={(e) => setNotificationIcon(e.target.value)}
-              className="border border-neutral-300 rounded px-2 py-1.5 text-xs bg-white"
-            >
-              <option value="Bell">Bell</option>
-              <option value="Megaphone">Megaphone</option>
-              <option value="Info">Info</option>
-              <option value="AlertTriangle">Alert triangle</option>
-              <option value="AlertCircle">Alert circle</option>
-              
-            </select>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <label className="min-w-0 text-xs text-neutral-500">
+              Icon
+              <span className="mt-1 flex items-center gap-2">
+                <select value={notificationIcon} onChange={(e) => setNotificationIcon(e.target.value)} className="min-w-0 flex-1 border border-neutral-300 rounded px-2 py-2 text-xs bg-white">
+                  <option value="Bell">Bell</option>
+                  <option value="Megaphone">Megaphone</option>
+                  <option value="Info">Info</option>
+                  <option value="AlertTriangle">Alert triangle</option>
+                  <option value="AlertCircle">Alert circle</option>
+                </select>
+                {(() => {
+                  const Icon = notificationIconComponents[notificationIcon] || Bell;
+                  return <Icon size={17} className="shrink-0 text-neutral-700" aria-hidden="true" />;
+                })()}
+              </span>
+            </label>
 
-            <label className="text-xs text-neutral-500">Priority</label>
-            <select
-              value={notificationPriority}
-              onChange={(e) => setNotificationPriority(e.target.value)}
-              className="border border-neutral-300 rounded px-2 py-1.5 text-xs bg-white"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
+            <label className="min-w-0 text-xs text-neutral-500">
+              Priority
+              <select value={notificationPriority} onChange={(e) => setNotificationPriority(e.target.value)} className="mt-1 w-full border border-neutral-300 rounded px-2 py-2 text-xs bg-white">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </label>
 
-            <button
-              type="button"
-              onClick={saveNotification}
-              disabled={notificationSaving}
-              className="ml-auto px-3 py-1.5 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
-            >
-              {notificationSaving ? "Saving…" : "Save notification"}
-            </button>
+            <div className="flex items-end">
+              <button type="button" onClick={saveNotification} disabled={notificationSaving} className="w-full px-3 py-2 bg-neutral-900 text-white rounded text-xs disabled:opacity-50">
+                {notificationSaving ? "Saving…" : "Save notification"}
+              </button>
+            </div>
           </div>
         </div>
 
