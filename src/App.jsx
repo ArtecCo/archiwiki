@@ -881,13 +881,7 @@ function ArchiWikiApp() {
     <div
       className={`h-screen flex overflow-hidden ${getThemeClasses()}`}
     >
-      <div
-        className={`hidden md:block h-full ${
-          isSidebarOpen
-            ? "max-md:block"
-            : ""
-        }`}
-      >
+      <div className="hidden md:block h-full">
         <Sidebar
           theme={theme}
           folders={folders}
