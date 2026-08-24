@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Bell, Megaphone, Info, AlertTriangle, TriangleAlert, CircleAlert } from "lucide-react";
 
 import {
   signInWithEmailAndPassword,
@@ -76,6 +77,7 @@ const [newInviteToken, setNewInviteToken] = useState("");
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [notificationContent, setNotificationContent] = useState("");
   const [notificationPriority, setNotificationPriority] = useState("low");
+  const [notificationIcon, setNotificationIcon] = useState("Bell");
   const [notificationSaving, setNotificationSaving] = useState(false);
   const notificationRef = doc(db, "adminMetrics", "notification");
 
@@ -255,9 +257,12 @@ const [newInviteToken, setNewInviteToken] = useState("");
         setNotificationEnabled(data.enabled === true);
         setNotificationContent(typeof data.content === "string" ? data.content : "");
         setNotificationPriority(
-          ["low", "medium", "critical"].includes(data.priority)
-            ? data.priority
-            : "low"
+          ["low", "medium", "critical"].includes(data.priority) ? data.priority : "low"
+        );
+        setNotificationIcon(
+          ["Bell", "Megaphone", "Info", "AlertTriangle", "TriangleAlert", "CircleAlert"].includes(data.icon)
+            ? data.icon
+            : "Bell"
         );
       },
       (err) => {
@@ -301,6 +306,7 @@ const [newInviteToken, setNewInviteToken] = useState("");
           enabled: notificationEnabled,
           content: notificationContent.trim(),
           priority: notificationPriority,
+          icon: notificationIcon,
           updatedAt: Date.now()
         },
         { merge: true }
@@ -1007,6 +1013,20 @@ const shareInviteLink = async (token) => {
           />
 
           <div className="mt-3 flex items-center gap-3">
+            <label className="text-xs text-neutral-500">Icon</label>
+            <select
+              value={notificationIcon}
+              onChange={(e) => setNotificationIcon(e.target.value)}
+              className="border border-neutral-300 rounded px-2 py-1.5 text-xs bg-white"
+            >
+              <option value="Bell">Bell</option>
+              <option value="Megaphone">Megaphone</option>
+              <option value="Info">Info</option>
+              <option value="AlertTriangle">Alert triangle</option>
+              <option value="TriangleAlert">Warning</option>
+              <option value="CircleAlert">Alert circle</option>
+            </select>
+
             <label className="text-xs text-neutral-500">Priority</label>
             <select
               value={notificationPriority}
