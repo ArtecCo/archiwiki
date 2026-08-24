@@ -1070,7 +1070,8 @@ function ArchiWikiApp() {
               <span className="md:hidden">Graph</span>
             </button>
 
-<div className="md:hidden flex items-center gap-1 ml-auto">
+{(activeNoteId || newNoteId) && (
+              <div className="md:hidden flex items-center gap-1 ml-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -1104,7 +1105,8 @@ function ArchiWikiApp() {
                 <Link2 size={13} />
                 <span>Links</span>
               </button>
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 text-xs max-md:w-full max-md:justify-between">
