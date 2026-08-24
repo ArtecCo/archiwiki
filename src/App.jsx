@@ -193,9 +193,12 @@ function ArchiWikiApp() {
           data.enabled === true && typeof data.content === "string" && data.content.trim()
             ? {
                 content: data.content.trim(),
-                priority: ["low", "medium", "critical"].includes(data.priority)
+                priority: ["low", "medium", "high", "critical"].includes(data.priority)
                   ? data.priority
-                  : "low"
+                  : "low",
+                icon: ["Bell", "Megaphone", "Info", "AlertTriangle", "AlertCircle"].includes(data.icon)
+                  ? data.icon
+                  : "Bell"
               }
             : null
         );
