@@ -5,6 +5,7 @@ import "./index.css";
 import "./sameNoteAnchors.js";
 import "./wikiEnhancements.js";
 import "./uiFixes.js";
+import "./finalUiFixes.js";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
 const root = ReactDOM.createRoot(
