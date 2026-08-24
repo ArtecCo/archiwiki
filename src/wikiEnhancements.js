@@ -244,7 +244,7 @@ const enhanceBacklinksPanel = () => {
   const structureButton = document.createElement("button");
   const backlinksButton = document.createElement("button");
   const structure = document.createElement("div");
-  structure.className = "archiwiki-structure-content flex-1 overflow-y-auto";
+  structure.className = "archiwiki-structure-content structure-tree-scrollbar flex-1 min-h-0 overflow-y-auto";
 
   structureButton.type = backlinksButton.type = "button";
   structureButton.textContent = "Structure";
