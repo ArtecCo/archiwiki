@@ -64,6 +64,15 @@ const enhanceSameNoteAnchors = () => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
       heading.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      heading.classList.remove("archiwiki-anchor-highlight");
+      // Force the animation to restart when the same link is clicked repeatedly.
+      void heading.offsetWidth;
+      heading.classList.add("archiwiki-anchor-highlight");
+      window.setTimeout(() => {
+        heading.classList.remove("archiwiki-anchor-highlight");
+      }, 1100);
+
       if (resolvedId) {
         window.history.replaceState(null, "", `#${encodeURIComponent(resolvedId)}`);
       }
@@ -71,11 +80,38 @@ const enhanceSameNoteAnchors = () => {
   });
 };
 
+const injectHighlightStyle = () => {
+  if (document.getElementById("archiwiki-anchor-highlight-style")) return;
+
+  const style = document.createElement("style");
+  style.id = "archiwiki-anchor-highlight-style";
+  style.textContent = `
+    @keyframes archiwikiAnchorPulse {
+      0%, 100% { background-color: transparent; }
+      25%, 65% { background-color: rgba(34, 197, 94, 0.24); }
+    }
+
+    .archiwiki-anchor-highlight {
+      animation: archiwikiAnchorPulse 1s ease-in-out;
+      border-radius: 0.2rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .archiwiki-anchor-highlight {
+        animation: none;
+        background-color: rgba(34, 197, 94, 0.24);
+      }
+    }
+  `;
+  document.head.appendChild(style);
+};
+
 let observer;
 
 const startSameNoteAnchors = () => {
   if (typeof document === "undefined") return;
 
+  injectHighlightStyle();
   enhanceSameNoteAnchors();
 
   const root = document.getElementById("root");
