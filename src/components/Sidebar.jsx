@@ -140,7 +140,7 @@ export default function Sidebar({
         <div className={`shrink-0 w-full px-2 sm:px-3 py-2 sm:py-3 border-t ${colors.divider}`}>
           <div
             role="status"
-            className={`w-full max-w-full overflow-hidden rounded-lg border-2 px-2.5 sm:px-3 py-2.5 sm:py-3 text-xs leading-5 shadow-sm pointer-events-none select-none ${
+            className={`w-full max-w-full overflow-hidden rounded-lg border px-2.5 sm:px-3 py-2.5 sm:py-3 text-xs leading-5 shadow-sm pointer-events-none select-none ${
               notification.priority === "critical"
                 ? "border-red-600 bg-red-500 text-white"
                 : notification.priority === "high"
@@ -148,10 +148,10 @@ export default function Sidebar({
                 : notification.priority === "medium"
                 ? "border-yellow-500 bg-yellow-400 text-neutral-950"
                 : theme === "charcoal"
-                ? "border-neutral-500 bg-neutral-800 text-neutral-100"
+                ? "border-neutral-700 bg-neutral-800 text-neutral-100 shadow-[0_0_0_1px_rgba(255,255,255,0.03)]"
                 : theme === "wikipedia"
-                ? "border-neutral-400 bg-neutral-100 text-neutral-900"
-                : "border-[#8B7355] bg-[#DCCBA8] text-neutral-950"
+                ? "border-neutral-300 bg-neutral-100 text-neutral-900 shadow-[0_0_0_1px_rgba(32,33,34,0.04)]"
+                : "border-[#C8BCA8] bg-[#E8E1D2] text-neutral-900 shadow-[0_0_0_1px_rgba(92,78,58,0.05)]"
             }`}
           >
             <div className="flex min-w-0 items-start gap-2">
