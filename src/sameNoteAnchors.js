@@ -30,9 +30,7 @@ const enhanceSameNoteAnchors = () => {
     const count = used.get(base) || 0;
     used.set(base, count + 1);
 
-    if (!existing) {
-      heading.id = count === 0 ? base : `${base}-${count + 1}`;
-    }
+    if (!existing) heading.id = count === 0 ? base : `${base}-${count + 1}`;
 
     const finalId = heading.id;
     byAnchor.set(normalizeAnchor(finalId), heading);
@@ -44,11 +42,8 @@ const enhanceSameNoteAnchors = () => {
     if (!rawTarget || rawTarget === "#") return;
 
     let target;
-    try {
-      target = decodeURIComponent(rawTarget.slice(1));
-    } catch {
-      target = rawTarget.slice(1);
-    }
+    try { target = decodeURIComponent(rawTarget.slice(1)); }
+    catch { target = rawTarget.slice(1); }
 
     const heading = byAnchor.get(normalizeAnchor(target));
     if (!heading) return;
@@ -58,6 +53,10 @@ const enhanceSameNoteAnchors = () => {
       link.setAttribute("href", `#${resolvedId}`);
     }
 
+    // Keep same-note links visually consistent with the app's green links,
+    // while distinguishing them with italic text.
+    link.classList.add("text-green-600", "italic");
+
     if (link.dataset.sameNoteAnchorBound === "true") return;
     link.dataset.sameNoteAnchorBound = "true";
 
@@ -66,12 +65,9 @@ const enhanceSameNoteAnchors = () => {
       heading.scrollIntoView({ behavior: "smooth", block: "start" });
 
       heading.classList.remove("archiwiki-anchor-highlight");
-      // Force the animation to restart when the same link is clicked repeatedly.
       void heading.offsetWidth;
       heading.classList.add("archiwiki-anchor-highlight");
-      window.setTimeout(() => {
-        heading.classList.remove("archiwiki-anchor-highlight");
-      }, 1100);
+      window.setTimeout(() => heading.classList.remove("archiwiki-anchor-highlight"), 1100);
 
       if (resolvedId) {
         window.history.replaceState(null, "", `#${encodeURIComponent(resolvedId)}`);
@@ -117,14 +113,8 @@ const startSameNoteAnchors = () => {
   const root = document.getElementById("root");
   if (!root || observer) return;
 
-  observer = new MutationObserver(() => {
-    enhanceSameNoteAnchors();
-  });
-
-  observer.observe(root, {
-    childList: true,
-    subtree: true
-  });
+  observer = new MutationObserver(() => enhanceSameNoteAnchors());
+  observer.observe(root, { childList: true, subtree: true });
 };
 
 if (document.readyState === "loading") {
