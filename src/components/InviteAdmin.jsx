@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Bell, Megaphone, Info, AlertTriangle, TriangleAlert, CircleAlert } from "lucide-react";
+import { Bell, Megaphone, Info, AlertTriangle, AlertCircle } from "lucide-react";
 
 import {
   signInWithEmailAndPassword,
@@ -260,7 +260,7 @@ const [newInviteToken, setNewInviteToken] = useState("");
           ["low", "medium", "critical"].includes(data.priority) ? data.priority : "low"
         );
         setNotificationIcon(
-          ["Bell", "Megaphone", "Info", "AlertTriangle", "TriangleAlert", "CircleAlert"].includes(data.icon)
+          ["Bell", "Megaphone", "Info", "AlertTriangle", "AlertCircle"].includes(data.icon)
             ? data.icon
             : "Bell"
         );
@@ -1023,8 +1023,8 @@ const shareInviteLink = async (token) => {
               <option value="Megaphone">Megaphone</option>
               <option value="Info">Info</option>
               <option value="AlertTriangle">Alert triangle</option>
-              <option value="TriangleAlert">Warning</option>
-              <option value="CircleAlert">Alert circle</option>
+              <option value="AlertCircle">Alert circle</option>
+              
             </select>
 
             <label className="text-xs text-neutral-500">Priority</label>
