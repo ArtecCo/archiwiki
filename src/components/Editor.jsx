@@ -2381,7 +2381,13 @@ return (
       &gt;
     </span>
 
-    <span className="font-medium text-neutral-700 shrink-0">
+    <span
+      className={`font-medium shrink-0 ${
+        theme === "charcoal"
+          ? "text-neutral-100"
+          : "text-neutral-700"
+      }`}
+    >
       {note.title || "Untitled"}
     </span>
   </div>
@@ -2431,12 +2437,17 @@ return (
           }
           className="
             w-16 sm:w-20
-            accent-neutral-900
             bg-neutral-200
             h-1
             rounded-lg
             cursor-pointer
           "
+          style={{
+            accentColor:
+              theme === "charcoal"
+                ? "#F5F5F5"
+                : "#171717"
+          }}
           aria-label="Font size"
         />
 
@@ -2931,13 +2942,7 @@ return (
 
         <span>
           Status:{" "}
-          <strong
-            className={
-              theme === "charcoal"
-                ? "text-neutral-100"
-                : "text-neutral-700"
-            }
-          >
+          <strong>
             Encrypted AES-256
           </strong>
         </span>
