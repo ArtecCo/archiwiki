@@ -51,6 +51,38 @@ const injectScrollbarStyles = () => {
   document.head.appendChild(style);
 };
 
+const tightenViewerSpacing = () => {
+  const viewer = document.getElementById("print-container");
+  if (!viewer) return;
+
+  const workspace = viewer.parentElement;
+  if (workspace && !workspace.classList.contains("archiwiki-viewer-workspace")) {
+    workspace.classList.add("archiwiki-viewer-workspace");
+  }
+
+  const content = viewer.querySelector(".wiki-content");
+  const title = content?.querySelector(":scope > h1");
+  if (title) title.classList.add("archiwiki-viewer-title");
+};
+
+const injectViewerSpacingStyles = () => {
+  if (document.getElementById("archiwiki-viewer-spacing-fix")) return;
+
+  const style = document.createElement("style");
+  style.id = "archiwiki-viewer-spacing-fix";
+  style.textContent = `
+    /* The viewer sits directly below the breadcrumb toolbar. */
+    .archiwiki-viewer-workspace {
+      padding-top: 1rem !important;
+    }
+
+    .archiwiki-viewer-title {
+      margin-top: 0.5rem !important;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
 const getStructureSource = () => {
   const editor = document.querySelector("textarea");
   if (editor && editor.offsetParent !== null) return { type: "markdown", value: editor.value };
@@ -185,6 +217,7 @@ const restoreCurrentFolder = () => {
 const startUiFixes = () => {
   if (typeof document === "undefined") return;
   injectScrollbarStyles();
+  injectViewerSpacingStyles();
 
   let scheduled = false;
   let restoreAttempts = 0;
@@ -192,6 +225,7 @@ const startUiFixes = () => {
 
   const refresh = () => {
     scheduled = false;
+    tightenViewerSpacing();
     renderStructure();
 
     const opened = restoreCurrentFolder();
