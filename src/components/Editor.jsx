@@ -35,7 +35,8 @@ export default function Editor({
   writingSince = "",
   breadcrumb = "",
   theme = "beige",
-  mobileReaderPanel = "article"
+  mobileReaderPanel = "article",
+  setMobileReaderPanel
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -2275,7 +2276,7 @@ let renderedHtml = marked.parse(protectedMarkdown, {
                   type="button"
                   onClick={() => {
                     const targetIndex = index;
-                    window.dispatchEvent(new CustomEvent("archiwiki-mobile-article"));
+                    setMobileReaderPanel?.("article");
                     window.setTimeout(() => {
                       document
                         .getElementById("print-container")
