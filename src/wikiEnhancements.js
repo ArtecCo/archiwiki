@@ -114,13 +114,19 @@ const getStructureHeadings = (root) => {
 };
 
 const buildTree = (container, root) => {
-  if (!container || !root) return;
-  const headings = getStructureHeadings(root);
+  if (!container) return;
   container.innerHTML = "";
+  if (!root) {
+    container.innerHTML = '<p class="text-neutral-400 italic">No headings in this note.</p>';
+    return;
+  }
+
+  const headings = getStructureHeadings(root);
   if (!headings.length) {
     container.innerHTML = '<p class="text-neutral-400 italic">No headings in this note.</p>';
     return;
   }
+
   const list = document.createElement("div");
   list.className = "space-y-0.5";
   headings.forEach(({ heading, title, level }, index) => {
@@ -144,9 +150,23 @@ const buildTree = (container, root) => {
   container.appendChild(list);
 };
 
+const findBacklinksPanel = () => Array.from(document.querySelectorAll("#root .border-l")).find((element) => element.textContent.includes("Backlinks ("));
+
+const refreshStructure = () => {
+  const panel = findBacklinksPanel();
+  const structure = panel?.querySelector(".archiwiki-structure-content");
+  if (!structure) return;
+  buildTree(structure, document.getElementById("print-container"));
+};
+
 const enhanceBacklinksPanel = () => {
-  const panel = Array.from(document.querySelectorAll("#root .border-l")).find((element) => element.textContent.includes("Backlinks ("));
-  if (!panel || panel.dataset.archiwikiStructureReady === "true") return;
+  const panel = findBacklinksPanel();
+  if (!panel) return;
+  if (panel.dataset.archiwikiStructureReady === "true") {
+    refreshStructure();
+    return;
+  }
+
   const heading = panel.querySelector("h4");
   const content = panel.querySelector("h4 + div");
   if (!heading || !content) return;
@@ -157,6 +177,8 @@ const enhanceBacklinksPanel = () => {
   const structureButton = document.createElement("button");
   const backlinksButton = document.createElement("button");
   const structure = document.createElement("div");
+  structure.className = "archiwiki-structure-content flex-1 overflow-y-auto";
+
   structureButton.type = backlinksButton.type = "button";
   structureButton.textContent = "Structure";
   backlinksButton.textContent = "Backlinks";
@@ -164,33 +186,50 @@ const enhanceBacklinksPanel = () => {
   const inactive = "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-neutral-400";
   structureButton.className = active;
   backlinksButton.className = inactive;
-  structure.className = "flex-1 overflow-y-auto";
+
   tabs.append(structureButton, backlinksButton);
   panel.insertBefore(tabs, heading);
   heading.classList.add("hidden");
 
   structureButton.addEventListener("click", () => {
-    structureButton.className = active; backlinksButton.className = inactive;
-    content.classList.add("hidden"); structure.classList.remove("hidden");
-    buildTree(structure, document.getElementById("print-container"));
+    structureButton.className = active;
+    backlinksButton.className = inactive;
+    content.classList.add("hidden");
+    structure.classList.remove("hidden");
+    refreshStructure();
   });
+
   backlinksButton.addEventListener("click", () => {
-    backlinksButton.className = active; structureButton.className = inactive;
-    structure.classList.add("hidden"); content.classList.remove("hidden");
+    backlinksButton.className = active;
+    structureButton.className = inactive;
+    structure.classList.add("hidden");
+    content.classList.remove("hidden");
   });
 
   panel.appendChild(structure);
   content.classList.add("hidden");
-  buildTree(structure, document.getElementById("print-container"));
+  refreshStructure();
+};
+
+let scheduled = false;
+const runEnhancements = () => {
+  if (scheduled) return;
+  scheduled = true;
+  queueMicrotask(() => {
+    scheduled = false;
+    wireCrossNoteHeaders();
+    finishPendingHeaderJump();
+    enhanceBacklinksPanel();
+    refreshStructure();
+  });
 };
 
 const start = () => {
   patchWikiRenderer();
-  const run = () => { wireCrossNoteHeaders(); finishPendingHeaderJump(); enhanceBacklinksPanel(); };
-  run();
+  runEnhancements();
   const root = document.getElementById("root");
   if (!root) return;
-  const observer = new MutationObserver(run);
+  const observer = new MutationObserver(runEnhancements);
   observer.observe(root, { childList: true, subtree: true });
 };
 
