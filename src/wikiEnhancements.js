@@ -101,16 +101,11 @@ const wireCrossNoteHeaders = () => {
   });
 };
 
-const getStructureHeadings = (root) => {
+const getViewerStructureHeadings = (root) => {
   if (!root) return [];
-
-  // The viewer has a generated H1 containing the note filename/title.
-  // It is presentation chrome, not a Markdown heading. The first real
-  // Markdown heading follows it and must be the first item in Structure.
   const allHeadings = Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"));
   const generatedTitle = root.querySelector(":scope > .wiki-content > h1") || root.querySelector(".wiki-content > h1");
   const markdownHeadings = allHeadings.filter((heading) => heading !== generatedTitle);
-
   const used = new Set();
   return markdownHeadings.map((heading) => {
     const title = heading.textContent.replace(/\s+/g, " ").trim();
@@ -119,30 +114,67 @@ const getStructureHeadings = (root) => {
     while (used.has(id)) id = `${base}-${n++}`;
     used.add(id);
     if (!heading.id) heading.id = id;
-    return { heading, title, level: Number(heading.tagName.slice(1)) };
+    return { heading, title, level: Number(heading.tagName.slice(1)), mode: "viewer" };
   });
 };
 
-let lastStructureRoot = null;
-let lastStructureSignature = null;
+const getEditStructureHeadings = (textarea) => {
+  if (!textarea) return [];
+  const lines = String(textarea.value || "").split(/\r?\n/);
+  const used = new Set();
+  return lines.map((line, lineIndex) => {
+    const match = line.match(/^\s*(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (!match) return null;
+    const title = match[2].trim();
+    const base = slugify(title) || "heading";
+    let id = base; let n = 2;
+    while (used.has(id)) id = `${base}-${n++}`;
+    used.add(id);
+    return { heading: null, title, level: match[1].length, mode: "edit", lineIndex, textarea };
+  }).filter(Boolean);
+};
 
-const getStructureSignature = (root) => {
-  if (!root) return "";
-  return Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"))
-    .filter((heading) => heading !== root.querySelector(":scope > .wiki-content > h1") && heading !== root.querySelector(".wiki-content > h1"))
-    .map((heading) => `${heading.tagName}:${heading.textContent.replace(/\s+/g, " ").trim()}`)
+const getStructureSource = () => {
+  const textarea = document.querySelector("textarea");
+  if (textarea && textarea.offsetParent !== null) return { mode: "edit", textarea };
+  const root = document.getElementById("print-container");
+  if (root) return { mode: "viewer", root };
+  return null;
+};
+
+let lastStructureKey = null;
+
+const getStructureItems = (source) =>
+  source?.mode === "edit"
+    ? getEditStructureHeadings(source.textarea)
+    : getViewerStructureHeadings(source?.root);
+
+const getStructureSignature = (source) => {
+  return getStructureItems(source)
+    .map((item) => `${item.level}:${item.title}`)
     .join("\u0001");
 };
 
-const buildTree = (container, root) => {
+const jumpToEditHeading = (item) => {
+  const textarea = item.textarea;
+  if (!textarea) return;
+  const lines = String(textarea.value || "").split(/\r?\n/);
+  const before = lines.slice(0, item.lineIndex).join("\n");
+  const position = before.length + (item.lineIndex ? 1 : 0);
+  textarea.focus();
+  textarea.setSelectionRange(position, position);
+  const ratio = item.lineIndex / Math.max(lines.length - 1, 1);
+  textarea.scrollTop = Math.max(0, ratio * textarea.scrollHeight - textarea.clientHeight * 0.25);
+};
+
+const buildTree = (container, source) => {
   if (!container) return;
   container.innerHTML = "";
-  if (!root) {
+  if (!source) {
     container.innerHTML = '<p class="text-neutral-400 italic">No headings in this note.</p>';
     return;
   }
-
-  const headings = getStructureHeadings(root);
+  const headings = getStructureItems(source);
   if (!headings.length) {
     container.innerHTML = '<p class="text-neutral-400 italic">No headings in this note.</p>';
     return;
@@ -150,7 +182,7 @@ const buildTree = (container, root) => {
 
   const list = document.createElement("div");
   list.className = "space-y-0.5";
-  headings.forEach(({ heading, title, level }, index) => {
+  headings.forEach(({ heading, title, level, mode, lineIndex, textarea }, index) => {
     const rowWrap = document.createElement("div");
     rowWrap.className = "flex items-stretch";
     rowWrap.style.paddingLeft = `${Math.max(0, level - 1) * 12}px`;
@@ -164,7 +196,14 @@ const buildTree = (container, root) => {
     row.className = "block flex-1 min-w-0 text-left py-1 px-2 rounded hover:bg-neutral-200/70 transition-colors truncate";
     row.textContent = title;
     row.title = title;
-    row.addEventListener("click", () => { heading.scrollIntoView({ behavior: "smooth", block: "start" }); highlightHeading(heading); });
+    row.addEventListener("click", () => {
+      if (mode === "edit") {
+        jumpToEditHeading({ lineIndex, textarea });
+        return;
+      }
+      heading.scrollIntoView({ behavior: "smooth", block: "start" });
+      highlightHeading(heading);
+    });
     rowWrap.append(guide, row);
     list.appendChild(rowWrap);
   });
@@ -176,15 +215,15 @@ const findBacklinksPanel = () => Array.from(document.querySelectorAll("#root .bo
 const refreshStructure = (force = false) => {
   const panel = findBacklinksPanel();
   const structure = panel?.querySelector(".archiwiki-structure-content");
-  const root = document.getElementById("print-container");
+  const source = getStructureSource();
   if (!structure) return;
 
-  const signature = getStructureSignature(root);
-  if (!force && root === lastStructureRoot && signature === lastStructureSignature) return;
+  const signature = getStructureSignature(source);
+  const key = `${source?.mode || "none"}:${signature}`;
+  if (!force && key === lastStructureKey) return;
 
-  lastStructureRoot = root;
-  lastStructureSignature = signature;
-  buildTree(structure, root);
+  lastStructureKey = key;
+  buildTree(structure, source);
 };
 
 const enhanceBacklinksPanel = () => {
@@ -258,7 +297,7 @@ const start = () => {
   const root = document.getElementById("root");
   if (!root) return;
   const observer = new MutationObserver(runEnhancements);
-  observer.observe(root, { childList: true, subtree: true });
+  observer.observe(root, { childList: true, subtree: true, characterData: true });
 };
 
 if (typeof document !== "undefined") {
