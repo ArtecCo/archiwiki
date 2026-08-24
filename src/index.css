@@ -279,3 +279,17 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 .dark .wiki-content hr {
   border-top-color: #525252;
 }
+
+/* Structure tree: keep the laptop sidebar visually clean. */
+@media (min-width: 768px) {
+  .structure-tree-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .structure-tree-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
