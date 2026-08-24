@@ -2885,7 +2885,7 @@ return (
       "env(safe-area-inset-bottom)"
   }}
 >
-  <div className="metrics-scrollbar w-full overflow-x-auto">
+  <div className="w-full overflow-x-auto">
     <div
       className="
         min-w-max
