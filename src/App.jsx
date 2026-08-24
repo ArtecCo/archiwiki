@@ -104,6 +104,52 @@ function ArchiWikiApp() {
   }, [theme]);
 
   useEffect(() => {
+    const themeConfig = {
+      beige: {
+        color: "#F5F2EB",
+        manifest: "/manifest-beige.json"
+      },
+      wikipedia: {
+        color: "#F8F9FA",
+        manifest: "/manifest-wikipedia.json"
+      },
+      charcoal: {
+        color: "#171717",
+        manifest: "/manifest-charcoal.json"
+      }
+    };
+
+    const selected = themeConfig[theme] || themeConfig.beige;
+
+    let themeMeta = document.querySelector(
+      'meta[name="theme-color"]'
+    );
+
+    if (!themeMeta) {
+      themeMeta = document.createElement("meta");
+      themeMeta.name = "theme-color";
+      document.head.appendChild(themeMeta);
+    }
+
+    themeMeta.setAttribute("content", selected.color);
+
+    let manifestLink = document.querySelector(
+      'link[rel="manifest"]'
+    );
+
+    if (!manifestLink) {
+      manifestLink = document.createElement("link");
+      manifestLink.rel = "manifest";
+      document.head.appendChild(manifestLink);
+    }
+
+    manifestLink.setAttribute("href", selected.manifest);
+
+    document.documentElement.style.colorScheme =
+      theme === "charcoal" ? "dark" : "light";
+  }, [theme]);
+
+  useEffect(() => {
     if (!user) {
       setEmail("");
       setPassword("");
