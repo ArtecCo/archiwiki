@@ -310,3 +310,19 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
     background: transparent !important;
   }
 }
+
+/* Laptop only: hide the structure-tree scrollbar and leave enough
+   bottom room to scroll the final heading above the fixed metrics bar. */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .structure-tree-scrollbar {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+    padding-bottom: 3.5rem !important;
+  }
+
+  .structure-tree-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
