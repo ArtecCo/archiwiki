@@ -34,7 +34,8 @@ export default function Editor({
   subfolderCount = 0,
   writingSince = "",
   breadcrumb = "",
-  theme = "beige"
+  theme = "beige",
+  mobileReaderPanel = "article"
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -2241,6 +2242,97 @@ let renderedHtml = marked.parse(protectedMarkdown, {
           `[[${note?.title}]]`
         )
     );
+
+  const mobileHeadings = String(body || "")
+    .split("\n")
+    .map((line) => {
+      const match = line.match(/^(#{1,6})\s+(.+)$/);
+      if (!match) return null;
+      return {
+        level: match[1].length,
+        text: match[2].trim()
+      };
+    })
+    .filter(Boolean);
+
+  const mobilePanel =
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 767px)").matches &&
+    mobileReaderPanel !== "article";
+
+  if (mobilePanel && mobileReaderPanel === "structure") {
+    return (
+      <div className={`h-full overflow-y-auto px-4 py-5 ${colors.page}`}>
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-sm font-semibold uppercase tracking-wider mb-4">
+            Structure
+          </h2>
+          {mobileHeadings.length > 0 ? (
+            <div className="space-y-1">
+              {mobileHeadings.map((heading, index) => (
+                <button
+                  key={`${heading.text}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    document
+                      .getElementById("print-container")
+                      ?.querySelectorAll("h1,h2,h3,h4,h5,h6")
+                      ?.[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className={`w-full text-left py-2 rounded px-2 ${colors.buttonHover}`}
+                  style={{ paddingLeft: `${8 + (heading.level - 1) * 14}px` }}
+                >
+                  <span className="text-xs text-neutral-400 mr-2">
+                    H{heading.level}
+                  </span>
+                  <span className="text-sm">{heading.text}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className={`text-sm italic ${colors.muted}`}>
+              No headings in this article yet.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (mobilePanel && mobileReaderPanel === "links") {
+    return (
+      <div className={`h-full overflow-y-auto px-4 py-5 ${colors.page}`}>
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-sm font-semibold uppercase tracking-wider mb-4">
+            Backlinks ({backlinks.length})
+          </h2>
+          {backlinks.length > 0 ? (
+            <div className="space-y-2">
+              {backlinks.map((backlink) => (
+                <button
+                  key={backlink.id}
+                  type="button"
+                  onClick={() => onNavigateToNote(backlink.id)}
+                  className={`w-full text-left p-3 border ${colors.border} ${colors.card} rounded ${colors.buttonHover}`}
+                >
+                  <p className={`font-semibold truncate ${theme === "charcoal" ? "text-neutral-100" : "text-neutral-900"}`}>
+                    {backlink.title}
+                  </p>
+                  <p className="text-[10px] text-neutral-500 truncate mt-1">
+                    {backlink.body}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className={`text-sm italic ${colors.muted}`}>
+              No connections link here yet.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   /*
    * ---------------------------------------------------------
