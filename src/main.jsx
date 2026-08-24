@@ -6,6 +6,7 @@ import "./pdfSafety.js";
 import "./sameNoteAnchors.js";
 import "./wikiEnhancements.js";
 import "./finalUiFixes.js";
+import "./scrollPositionFix.js";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
 const root = ReactDOM.createRoot(
