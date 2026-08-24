@@ -7,7 +7,6 @@ const installSharedScrollbars = () => {
   style.id = "archiwiki-shared-scrollbar-fix";
   style.textContent = `
     textarea,
-    #print-container,
     .archiwiki-editor-viewer-scroll,
     .archiwiki-editor-viewer-scroll .wiki-content {
       scrollbar-width: thin;
@@ -15,7 +14,6 @@ const installSharedScrollbars = () => {
     }
 
     textarea::-webkit-scrollbar,
-    #print-container::-webkit-scrollbar,
     .archiwiki-editor-viewer-scroll::-webkit-scrollbar,
     .archiwiki-editor-viewer-scroll .wiki-content::-webkit-scrollbar {
       width: 4px;
@@ -23,14 +21,12 @@ const installSharedScrollbars = () => {
     }
 
     textarea::-webkit-scrollbar-track,
-    #print-container::-webkit-scrollbar-track,
     .archiwiki-editor-viewer-scroll::-webkit-scrollbar-track,
     .archiwiki-editor-viewer-scroll .wiki-content::-webkit-scrollbar-track {
       background: transparent;
     }
 
     textarea::-webkit-scrollbar-thumb,
-    #print-container::-webkit-scrollbar-thumb,
     .archiwiki-editor-viewer-scroll::-webkit-scrollbar-thumb,
     .archiwiki-editor-viewer-scroll .wiki-content::-webkit-scrollbar-thumb {
       background: #000;
@@ -39,44 +35,85 @@ const installSharedScrollbars = () => {
     }
 
     textarea::-webkit-scrollbar-thumb:hover,
-    #print-container::-webkit-scrollbar-thumb:hover,
     .archiwiki-editor-viewer-scroll::-webkit-scrollbar-thumb:hover,
     .archiwiki-editor-viewer-scroll .wiki-content::-webkit-scrollbar-thumb:hover {
       background: #000;
     }
 
-    /* The viewer's outer workspace is the original scroll container.
-       Keep it as-is and give it the same custom scrollbar. */
-    .archiwiki-editor-viewer-scroll {
-      scrollbar-width: thin;
-      scrollbar-color: #000 transparent;
-    }
-
-    .dark textarea,
-    .dark #print-container,
-    .dark .archiwiki-editor-viewer-scroll,
-    .dark .archiwiki-editor-viewer-scroll .wiki-content {
+    textarea[data-archiwiki-dark="true"],
+    .archiwiki-editor-viewer-scroll[data-archiwiki-dark="true"],
+    .archiwiki-editor-viewer-scroll[data-archiwiki-dark="true"] .wiki-content {
       scrollbar-color: #fff transparent;
     }
 
-    .dark textarea::-webkit-scrollbar-thumb,
-    .dark #print-container::-webkit-scrollbar-thumb,
-    .dark .archiwiki-editor-viewer-scroll::-webkit-scrollbar-thumb,
-    .dark .archiwiki-editor-viewer-scroll .wiki-content::-webkit-scrollbar-thumb,
-    .dark textarea::-webkit-scrollbar-thumb:hover,
-    .dark #print-container::-webkit-scrollbar-thumb:hover,
-    .dark .archiwiki-editor-viewer-scroll::-webkit-scrollbar-thumb:hover,
-    .dark .archiwiki-editor-viewer-scroll .wiki-content::-webkit-scrollbar-thumb:hover {
+    textarea[data-archiwiki-dark="true"]::-webkit-scrollbar-thumb,
+    .archiwiki-editor-viewer-scroll[data-archiwiki-dark="true"]::-webkit-scrollbar-thumb,
+    .archiwiki-editor-viewer-scroll[data-archiwiki-dark="true"] .wiki-content::-webkit-scrollbar-thumb,
+    textarea[data-archiwiki-dark="true"]::-webkit-scrollbar-thumb:hover,
+    .archiwiki-editor-viewer-scroll[data-archiwiki-dark="true"]::-webkit-scrollbar-thumb:hover,
+    .archiwiki-editor-viewer-scroll[data-archiwiki-dark="true"] .wiki-content::-webkit-scrollbar-thumb:hover {
       background: #fff;
     }
   `;
   document.head.appendChild(style);
 };
 
-if (typeof document !== "undefined") {
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", installSharedScrollbars, { once: true });
-  } else {
-    installSharedScrollbars();
+const isDarkTheme = (element) => {
+  let node = element;
+  while (node && node !== document.body) {
+    if (node.classList?.contains("bg-neutral-900")) return true;
+    node = node.parentElement;
   }
+  return false;
+};
+
+const markScrollers = () => {
+  const textarea = document.querySelector("textarea");
+  if (textarea) {
+    textarea.classList.add("archiwiki-editor-viewer-scroll");
+    textarea.dataset.archiwikiDark = isDarkTheme(textarea) ? "true" : "false";
+  }
+
+  const viewer = document.getElementById("print-container");
+  if (viewer) {
+    let node = viewer;
+    let scroller = null;
+
+    while (node && node !== document.body) {
+      const styles = window.getComputedStyle(node);
+      if (styles.overflowY === "auto" || styles.overflowY === "scroll") {
+        scroller = node;
+        break;
+      }
+      node = node.parentElement;
+    }
+
+    if (scroller) {
+      scroller.classList.add("archiwiki-editor-viewer-scroll");
+      scroller.dataset.archiwikiDark = isDarkTheme(scroller) ? "true" : "false";
+    }
+  }
+};
+
+const startFinalUiFixes = () => {
+  if (typeof document === "undefined") return;
+  installSharedScrollbars();
+
+  let timer = null;
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(markScrollers, 40);
+  };
+
+  schedule();
+  const root = document.getElementById("root");
+  if (!root) return;
+  const observer = new MutationObserver(schedule);
+  observer.observe(root, { childList: true, subtree: true, attributes: true });
+};
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startFinalUiFixes, { once: true });
+} else {
+  startFinalUiFixes();
 }
