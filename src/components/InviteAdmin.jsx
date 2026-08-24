@@ -1,41 +1,1176 @@
-import React,{useEffect,useState}from"react";
-import{signInWithEmailAndPassword,onAuthStateChanged,signOut}from"firebase/auth";
-import{collection,setDoc,onSnapshot,query,orderBy,serverTimestamp,doc,getDoc,updateDoc}from"firebase/firestore";
-import{auth,db}from"../firebase";
-import{Wrench,LogOut}from"lucide-react";
+import React, { useEffect, useState } from "react";
 
-const maintenanceRef=doc(db,"adminMetrics","maintenance");
-const gen=()=>{const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",v=new Uint32Array(12);crypto.getRandomValues(v);return Array.from(v,x=>a[x%a.length]).join("")};
-const timeout=(p,m=8000)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error("Administrator access check timed out.")),m))]);
+import {
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from "firebase/auth";
 
-export default function InviteAdmin(){
- const[user,setUser]=useState(null),[authorized,setAuthorized]=useState(false),[checking,setChecking]=useState(true),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[invites,setInvites]=useState([]),[error,setError]=useState(""),[message,setMessage]=useState(""),[creating,setCreating]=useState(false),[loggingIn,setLoggingIn]=useState(false),[newToken,setNewToken]=useState(""),[maintenance,setMaintenance]=useState(false),[savingMaintenance,setSavingMaintenance]=useState(false);
+import {
+  collection,
+  setDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  doc,
+  getDoc,
+  updateDoc
+} from "firebase/firestore";
 
- useEffect(()=>{let mounted=true;return onAuthStateChanged(auth,async u=>{if(!mounted)return;setUser(u);setAuthorized(false);if(!u){setChecking(false);return}try{const s=await timeout(getDoc(doc(db,"admins",u.uid)));if(s.exists()&&s.data()?.enabled===true){setAuthorized(true)}else{await signOut(auth);setUser(null);setError("This Firebase account is not authorized as an administrator.")}}catch(e){setError(e?.message||"Unable to verify administrator access.")}finally{if(mounted)setChecking(false)}})},[]);
- useEffect(()=>{if(!authorized){setInvites([]);return}return onSnapshot(query(collection(db,"pendingInvites"),orderBy("createdAt","desc")),s=>setInvites(s.docs.map(d=>({id:d.id,...d.data()}))),e=>setError(e?.message||"Unable to load invitations.")},[authorized]);
- useEffect(()=>{if(!authorized)return;return onSnapshot(maintenanceRef,async s=>{if(!s.exists()){try{await setDoc(maintenanceRef,{inMaintenance:false,updatedAt:Date.now()},{merge:true})}catch(e){console.error(e)}setMaintenance(false);return}setMaintenance(s.data()?.inMaintenance===true)},e=>setError("Unable to read maintenance status. Check Firestore rules."))},[authorized]);
+import { auth, db } from "../firebase";
 
- const login=async e=>{e.preventDefault();if(loggingIn)return;setLoggingIn(true);setError("");try{const c=await signInWithEmailAndPassword(auth,email.trim().toLowerCase(),password);const s=await timeout(getDoc(doc(db,"admins",c.user.uid)));if(!s.exists()||s.data()?.enabled!==true){await signOut(auth);throw new Error("This account is not authorized as an administrator.")}setUser(c.user);setAuthorized(true);setEmail("");setPassword("")}catch(e){setError(e?.message||"Unable to sign in.")}finally{setLoggingIn(false)}};
- const toggle=async()=>{if(savingMaintenance)return;setSavingMaintenance(true);setError("");try{await setDoc(maintenanceRef,{inMaintenance:!maintenance,updatedAt:Date.now()},{merge:true})}catch(e){setError(e?.message||"Unable to change maintenance mode. Check Firestore rules.")}finally{setSavingMaintenance(false)}};
- const create=async()=>{if(creating)return;setCreating(true);setError("");try{const token=gen();await setDoc(doc(db,"pendingInvites",token),{token,status:"available",used:false,claimId:null,claimedAt:null,usedBy:null,usedEmail:null,usedAt:null,createdAt:serverTimestamp(),createdBy:user.uid});setNewToken(token);setMessage("Invitation created: "+token)}catch(e){setError(e?.message||"Unable to create invitation.")}finally{setCreating(false)}};
- const link=t=>`${location.origin}/?invite=${encodeURIComponent(t)}`;
- const copy=async(t)=>{try{await navigator.clipboard.writeText(link(t));setMessage("Invitation link copied.");setError("")}catch{setError("Unable to copy the invitation link.")}};
- const revoke=async i=>{const t=i.token||i.id;if(!t||i.status==="used"||i.status==="revoked"||!confirm("Revoke invitation "+t+"?"))return;try{await updateDoc(doc(db,"pendingInvites",t),{status:"revoked",revoked:true,revokedAt:serverTimestamp(),revokedBy:user.uid});setMessage("Invitation revoked.");setError("")}catch(e){setError(e?.message||"Unable to revoke invitation.")}};
- const logout=async()=>{await signOut(auth);setUser(null);setAuthorized(false);setInvites([])};
- const date=v=>{if(!v)return"—";try{const d=typeof v.toDate==="function"?v.toDate():new Date(v);return d.toLocaleString()}catch{return"—"}};
 
- if(checking)return <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB]"><div className="bg-white border border-neutral-300 rounded p-7 shadow-sm text-center"><b>ArchiWiki Administration</b><p className="text-xs text-neutral-500 mt-2">Checking administrator access…</p></div></div>;
- if(!user||!authorized)return <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] p-6"><form onSubmit={login} className="w-full max-w-sm bg-white border border-neutral-300 rounded shadow-sm p-7 space-y-4"><h1 className="text-xl font-bold text-center">ArchiWiki Administration</h1><p className="text-xs text-neutral-500 text-center">Private administrator access</p><input type="email" required placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"/><input type="password" required placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"/>{error&&<p className="p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">{error}</p>}<button disabled={loggingIn} className="w-full py-2 bg-neutral-900 text-white rounded text-sm">{loggingIn?"Signing in…":"Sign in"}</button></form></div>;
+const generateInviteCode = () => {
+  const alphabet =
+    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
- return <div className="min-h-screen bg-[#F5F2EB] text-neutral-900 p-6"><div className="max-w-5xl mx-auto">
-  <header className="flex items-center justify-between mb-8"><div><h1 className="text-2xl font-bold">Invitation Manager</h1><p className="text-xs text-neutral-500 mt-1">ArchiWiki administrator</p></div><div className="flex items-center gap-2">
-   <button onClick={toggle} disabled={savingMaintenance} aria-pressed={maintenance} title={maintenance?"Maintenance mode is ON":"Maintenance mode is OFF"} className="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"><Wrench size={13}/><span>Maintenance</span><span className={"h-2 w-2 rounded-full "+(maintenance?"bg-amber-500":"bg-green-600")}/></button>
-   <button onClick={logout} title="Sign out" className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"><LogOut size={13}/>Sign out</button>
-  </div></header>
-  {error&&<div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">{error}</div>}
-  {message&&<div className="mb-4 rounded border border-green-200 bg-green-50 px-4 py-2.5 text-xs text-green-700">{message}{newToken&&<button onClick={()=>copy(newToken)} className="ml-3 underline">Copy link</button>}</div>}
-  <div className="bg-white border border-neutral-300 rounded p-6 mb-6"><h2 className="font-semibold mb-2">Create invitation</h2><p className="text-xs text-neutral-500 mb-4">Generate a single-use invitation token.</p><button onClick={create} disabled={creating} className="px-4 py-2 bg-neutral-900 text-white rounded text-sm">{creating?"Creating…":"Generate Invite"}</button></div>
-  <div className="bg-white border border-neutral-300 rounded overflow-hidden"><div className="p-5 border-b border-neutral-200"><h2 className="font-semibold">Invitations</h2><p className="text-xs text-neutral-500 mt-1">{invites.length} invitation{invites.length===1?"":"s"}</p></div>
-  {invites.length===0?<div className="p-8 text-center text-sm text-neutral-500">No invitations yet.</div>:<div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b text-left"><th className="p-4">Code</th><th className="p-4">Status</th><th className="p-4">Created</th><th className="p-4">Used by</th><th className="p-4">Used at</th><th className="p-4">Actions</th></tr></thead><tbody>{invites.map(i=>{const t=i.token||i.id,s=i.status||(i.used?"Used":"Available");return <tr key={i.id} className="border-b border-neutral-100"><td className="p-4 font-mono">{t}</td><td className="p-4">{s}</td><td className="p-4 text-neutral-500">{date(i.createdAt)}</td><td className="p-4">{i.usedEmail||"—"}</td><td className="p-4 text-neutral-500">{date(i.usedAt)}</td><td className="p-4">{s!=="used"&&s!=="revoked"?<button onClick={()=>revoke(i)} className="text-red-600 hover:underline">Revoke</button>:"—"}</td></tr>})}</tbody></table></div>}</div>
- </div></div>;
+  const values = new Uint32Array(12);
+
+  crypto.getRandomValues(values);
+
+  return Array.from(values, (value) =>
+    alphabet[value % alphabet.length]
+  ).join("");
+};
+
+
+/*
+ * Prevent Firestore from keeping the admin page
+ * stuck forever if the request never resolves.
+ */
+const withTimeout = (promise, timeoutMs = 8000) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            "The administrator access check timed out. Please check your Firebase connection and Firestore rules."
+          )
+        );
+      }, timeoutMs);
+    })
+  ]);
+};
+
+
+export default function InviteAdmin() {
+  const [user, setUser] = useState(null);
+  const [authorized, setAuthorized] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [invites, setInvites] = useState([]);
+
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const [creating, setCreating] = useState(false);
+const [loggingIn, setLoggingIn] = useState(false);
+const [newInviteToken, setNewInviteToken] = useState("");
+  const [maintenance, setMaintenance] = useState(false);
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+
+  const maintenanceRef = doc(db, "adminMetrics", "maintenance");
+
+
+  /*
+   * Firebase Auth listener.
+   *
+   * This component deliberately handles its own authentication.
+   * It does NOT depend on AuthContext.
+   */
+  useEffect(() => {
+    let mounted = true;
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentUser) => {
+        if (!mounted) return;
+
+        setUser(currentUser);
+        setAuthorized(false);
+        setError("");
+
+        /*
+         * No authenticated user.
+         *
+         * We can immediately show the admin login.
+         */
+        if (!currentUser) {
+          setCheckingAccess(false);
+          return;
+        }
+
+        /*
+         * Authenticated user exists.
+         *
+         * Now verify that the user's UID exists in:
+         *
+         * adminUsers/{uid}
+         *
+         * and that:
+         *
+         * active === true
+         */
+        try {
+          const adminRef = doc(
+            db,
+            "adminUsers",
+            currentUser.uid
+          );
+
+          const adminSnap = await withTimeout(
+            getDoc(adminRef),
+            8000
+          );
+
+          if (!mounted) return;
+
+          if (
+            adminSnap.exists() &&
+            adminSnap.data()?.active === true
+          ) {
+            setAuthorized(true);
+            setError("");
+          } else {
+            setAuthorized(false);
+
+            /*
+             * The Firebase account exists, but is not
+             * an administrator.
+             */
+            setError(
+              "This Firebase account is not authorized as an administrator."
+            );
+
+            /*
+             * Remove the authenticated session so that
+             * the login screen is shown cleanly.
+             */
+            try {
+              await signOut(auth);
+            } catch (signOutError) {
+              console.error(
+                "Failed to sign out unauthorized user:",
+                signOutError
+              );
+            }
+
+            if (!mounted) return;
+
+            setUser(null);
+          }
+        } catch (err) {
+          console.error(
+            "Failed to check administrator access:",
+            err
+          );
+
+          if (!mounted) return;
+
+          setAuthorized(false);
+
+          setError(
+            err?.message ||
+              "Unable to verify administrator access."
+          );
+        } finally {
+          if (mounted) {
+            setCheckingAccess(false);
+          }
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+
+  /*
+   * Load invitations only after administrator access
+   * has been confirmed.
+   */
+  useEffect(() => {
+    if (!authorized) {
+      setInvites([]);
+      return;
+    }
+
+    const invitesQuery = query(
+      collection(db, "pendingInvites"),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(
+      invitesQuery,
+      (snapshot) => {
+        setInvites(
+          snapshot.docs.map((item) => ({
+            id: item.id,
+            ...item.data()
+          }))
+        );
+
+        /*
+         * Clear an old error if the query succeeds.
+         */
+        setError("");
+      },
+      (err) => {
+        console.error(
+          "Failed to load invitations:",
+          err
+        );
+
+        setError(
+          err?.message ||
+            "Unable to load invitations. Check Firestore rules."
+        );
+      }
+    );
+
+    return unsubscribe;
+  }, [authorized]);
+
+
+  useEffect(() => {
+    if (!authorized) return;
+
+    const unsubscribe = onSnapshot(
+      maintenanceRef,
+      (snapshot) => {
+        setMaintenance(
+          snapshot.exists() && snapshot.data()?.inMaintenance === true
+        );
+      },
+      (err) => {
+        console.error("Failed to load maintenance status:", err);
+        setError("Unable to read maintenance status. Check Firestore rules.");
+      }
+    );
+
+    return unsubscribe;
+  }, [authorized]);
+
+  const toggleMaintenance = async () => {
+    if (maintenanceSaving) return;
+
+    setMaintenanceSaving(true);
+    setError("");
+
+    try {
+      await setDoc(
+        maintenanceRef,
+        {
+          inMaintenance: !maintenance,
+          updatedAt: Date.now()
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Failed to update maintenance mode:", err);
+      setError(
+        err?.message ||
+          "Unable to change maintenance mode. Check Firestore rules."
+      );
+    } finally {
+      setMaintenanceSaving(false);
+    }
+  };
+
+  /*
+   * Administrator login.
+   */
+  const handleLogin = async (event) => {
+    event.preventDefault();
+
+    if (loggingIn) return;
+
+    setError("");
+    setMessage("");
+    setLoggingIn(true);
+
+    try {
+      const normalizedEmail =
+        email.trim().toLowerCase();
+
+      if (!normalizedEmail) {
+        throw new Error(
+          "Please enter your email address."
+        );
+      }
+
+      if (!password) {
+        throw new Error(
+          "Please enter your password."
+        );
+      }
+
+      const credential =
+        await signInWithEmailAndPassword(
+          auth,
+          normalizedEmail,
+          password
+        );
+
+      /*
+       * Explicitly check the admin document here.
+       *
+       * This gives the login action a direct result instead
+       * of depending only on the Auth state listener.
+       */
+      const adminRef = doc(
+        db,
+        "adminUsers",
+        credential.user.uid
+      );
+
+      const adminSnap = await withTimeout(
+        getDoc(adminRef),
+        8000
+      );
+
+      if (!adminSnap.exists()) {
+        await signOut(auth);
+
+        throw new Error(
+          "Administrator record not found. Create adminUsers/" +
+            credential.user.uid +
+            " in Firestore."
+        );
+      }
+
+      if (adminSnap.data()?.active !== true) {
+        await signOut(auth);
+
+        throw new Error(
+          "This account is not authorized as an administrator."
+        );
+      }
+
+      /*
+       * Successful login.
+       *
+       * The onAuthStateChanged listener will also run,
+       * but the access check above guarantees that we do
+       * not wait indefinitely for it.
+       */
+      setUser(credential.user);
+      setAuthorized(true);
+
+      setEmail("");
+      setPassword("");
+      setError("");
+      setMessage("Administrator access granted.");
+    } catch (err) {
+      console.error(
+        "Admin login failed:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to sign in."
+      );
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+
+  /*
+   * Create invitation.
+   */
+  const createInvite = async () => {
+    if (!user || !authorized) {
+      setError(
+        "You are not authorized to create invitations."
+      );
+      return;
+    }
+
+    if (creating) return;
+
+    setError("");
+    setMessage("");
+    setCreating(true);
+
+    try {
+      const token = generateInviteCode();
+
+      await setDoc(
+        doc(db, "pendingInvites", token),
+        {
+          token,
+
+          status: "available",
+
+          used: false,
+
+          claimId: null,
+          claimedAt: null,
+
+          usedBy: null,
+          usedEmail: null,
+          usedAt: null,
+
+          createdAt: serverTimestamp(),
+
+          createdBy: user.uid
+        }
+      );
+
+      setNewInviteToken(token);
+
+setMessage(
+  `Invitation created: ${token}`
+);
+    } catch (err) {
+      console.error(
+        "Failed to create invitation:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to create invitation."
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+
+  /*
+   * Copy invitation.
+   */
+  /*
+ * Build the shareable registration link for an invitation.
+ *
+ * Example:
+ * https://archithswiki.netlify.app/?invite=ABC123XYZ
+ */
+const getInviteLink = (token) => {
+  const normalizedToken = String(token || "").trim();
+
+  if (!normalizedToken) return "";
+
+  return `${window.location.origin}/?invite=${encodeURIComponent(
+    normalizedToken
+  )}`;
+};
+
+
+  /*
+ * Copy the raw invitation code only.
+ */
+const copyInviteCode = async (token) => {
+  const code = String(token || "").trim();
+
+  if (!code) {
+    setError("Unable to copy the invitation code.");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(code);
+
+    setMessage("Invitation code copied.");
+    setError("");
+  } catch (err) {
+    console.error(
+      "Unable to copy invitation code:",
+      err
+    );
+
+    setError(
+      "Unable to copy the invitation code."
+    );
+  }
+};
+
+  /*
+ * Revoke an invitation.
+ *
+ * The invitation is retained in Firestore for audit/history,
+ * but its status changes to "revoked".
+ */
+const revokeInvite = async (invite) => {
+  if (!user || !authorized) {
+    setError(
+      "You are not authorized to revoke invitations."
+    );
+    return;
+  }
+
+  const token = String(
+    invite?.token || invite?.id || ""
+  ).trim();
+
+  if (!token) {
+    setError("Unable to identify this invitation.");
+    return;
+  }
+
+  if (invite.status === "revoked") {
+    setError("This invitation has already been revoked.");
+    return;
+  }
+
+  if (invite.status === "used" || invite.used) {
+    setError("A used invitation cannot be revoked.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Revoke invitation ${token}?\n\nThis invitation will no longer be usable.`
+  );
+
+  if (!confirmed) return;
+
+  setError("");
+  setMessage("");
+
+  try {
+    await updateDoc(
+      doc(db, "pendingInvites", token),
+      {
+        status: "revoked",
+        revoked: true,
+        revokedAt: serverTimestamp(),
+        revokedBy: user.uid
+      }
+    );
+
+    setMessage(
+      `Invitation ${token} has been revoked.`
+    );
+  } catch (err) {
+    console.error(
+      "Failed to revoke invitation:",
+      err
+    );
+
+    setError(
+      err?.message ||
+        "Unable to revoke the invitation."
+    );
+  }
+};
+  
+
+
+/*
+ * Copy the full registration link.
+ */
+const copyInviteLink = async (token) => {
+  const inviteLink = getInviteLink(token);
+
+  if (!inviteLink) {
+    setError("Unable to create the invitation link.");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(inviteLink);
+
+    setMessage("Invitation link copied.");
+    setError("");
+  } catch (err) {
+    console.error(
+      "Unable to copy invitation link:",
+      err
+    );
+
+    setError(
+      "Unable to copy the invitation link."
+    );
+  }
+};
+
+
+/*
+ * Share the full registration link.
+ *
+ * On phones/tablets and supported browsers this opens
+ * the native sharing menu.
+ *
+ * If Web Share is unavailable, fall back to copying
+ * the link to the clipboard.
+ */
+const shareInviteLink = async (token) => {
+  const inviteLink = getInviteLink(token);
+
+  if (!inviteLink) {
+    setError("Unable to create the invitation link.");
+    return;
+  }
+
+  const shareData = {
+    title: "ArchiWiki Invitation",
+    text: "You're invited to join ArchiWiki.",
+    url: inviteLink
+  };
+
+  try {
+    if (
+      navigator.share &&
+      typeof navigator.share === "function"
+    ) {
+      await navigator.share(shareData);
+
+      setMessage("Invitation link ready to share.");
+      setError("");
+      return;
+    }
+
+    // Desktop browsers that don't support Web Share:
+    await navigator.clipboard.writeText(inviteLink);
+
+    setMessage(
+      "Sharing isn't available here, so the invitation link was copied instead."
+    );
+    setError("");
+  } catch (err) {
+    // User closing/cancelling the native share dialog
+    // is not an application error.
+    if (err?.name === "AbortError") {
+      return;
+    }
+
+    console.error(
+      "Unable to share invitation link:",
+      err
+    );
+
+    // Final fallback to clipboard.
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+
+      setMessage(
+        "Unable to open sharing, so the invitation link was copied instead."
+      );
+      setError("");
+    } catch (copyError) {
+      console.error(
+        "Unable to copy invitation link:",
+        copyError
+      );
+
+      setError(
+        "Unable to share or copy the invitation link."
+      );
+    }
+  }
+};
+
+
+  /*
+   * Sign out.
+   */
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+
+      setUser(null);
+      setAuthorized(false);
+      setInvites([]);
+      setNewInviteToken("");
+      setEmail("");
+      setPassword("");
+
+      setMessage("");
+      setError("");
+    } catch (err) {
+      console.error(
+        "Admin sign out failed:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Unable to sign out."
+      );
+    }
+  };
+
+
+  /*
+   * Firestore Timestamp formatter.
+   */
+  const formatDate = (value) => {
+    if (!value) return "—";
+
+    try {
+      const date =
+        typeof value.toDate === "function"
+          ? value.toDate()
+          : new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return "—";
+      }
+
+      return date.toLocaleString();
+    } catch {
+      return "—";
+    }
+  };
+
+
+  /*
+   * INITIAL ACCESS CHECK
+   */
+  if (checkingAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] p-6">
+        <div className="w-full max-w-sm bg-white border border-neutral-300 rounded shadow-md p-7 text-center">
+          <h1 className="text-xl font-bold">
+            ArchiWiki Administration
+          </h1>
+
+          <p className="text-xs text-neutral-500 mt-3">
+            Checking administrator access…
+          </p>
+
+          <p className="text-[11px] text-neutral-400 mt-2">
+            This check will time out if Firebase is unreachable.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+
+  /*
+   * LOGIN SCREEN
+   */
+  if (!user || !authorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] p-6">
+        <div className="w-full max-w-sm bg-white border border-neutral-300 rounded shadow-md p-7">
+
+          <h1 className="text-xl font-bold text-center">
+            ArchiWiki Administration
+          </h1>
+
+          <p className="text-xs text-neutral-500 text-center mt-2 mb-6">
+            Private administrator access
+          </p>
+
+          <form
+            onSubmit={handleLogin}
+            className="space-y-4"
+          >
+
+            <div>
+              <label className="block text-xs font-semibold mb-1">
+                Email
+              </label>
+
+              <input
+                type="email"
+                required
+                autoComplete="username"
+                value={email}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+                className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+
+            <div>
+              <label className="block text-xs font-semibold mb-1">
+                Password
+              </label>
+
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+                className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"
+              />
+            </div>
+
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded">
+                <p className="text-xs text-red-700">
+                  {error}
+                </p>
+              </div>
+            )}
+
+{/*
+            {message && (
+              <p className="text-xs text-green-700">
+                {message}
+              </p>
+            )}
+            */}
+
+            {message && (
+  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+    <p className="text-xs text-green-700">
+      {message}
+    </p>
+
+    {newInviteToken && (
+      <div className="mt-3">
+        <p className="text-xs font-mono text-green-900 break-all">
+          {getInviteLink(newInviteToken)}
+        </p>
+
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              copyInviteLink(newInviteToken)
+            }
+            className="px-3 py-1.5 border border-green-300 rounded text-xs text-green-800 hover:bg-green-100"
+          >
+            Copy link
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              shareInviteLink(newInviteToken)
+            }
+            className="px-3 py-1.5 bg-neutral-900 text-white rounded text-xs hover:bg-neutral-800"
+          >
+            Share
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+            
+
+
+            <button
+              type="submit"
+              disabled={loggingIn}
+              className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded text-sm font-semibold disabled:opacity-50"
+            >
+              {loggingIn
+                ? "Signing in…"
+                : "Sign in"}
+            </button>
+
+          </form>
+
+        </div>
+      </div>
+    );
+  }
+
+
+  /*
+   * ADMIN DASHBOARD
+   */
+  return (
+    <div className="min-h-screen bg-[#F5F2EB] text-neutral-900 p-6">
+
+      <div className="max-w-5xl mx-auto">
+
+        <div className="flex items-center justify-between mb-8">
+
+          <div>
+            <h1 className="text-2xl font-bold">
+              Invitation Manager
+            </h1>
+
+            <p className="text-xs text-neutral-500 mt-1">
+              ArchiWiki administrator
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleMaintenance}
+              disabled={maintenanceSaving}
+              aria-pressed={maintenance}
+              title={maintenance ? "Maintenance mode is ON" : "Maintenance mode is OFF"}
+              className="inline-flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            >
+              <span>Maintenance</span>
+              <span className={maintenance ? "h-2 w-2 rounded-full bg-amber-500" : "h-2 w-2 rounded-full bg-green-600"} />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="text-xs text-neutral-500 hover:text-neutral-900"
+            >
+              Sign out
+            </button>
+          </div>
+
+        </div>
+
+
+        <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+
+          <h2 className="font-semibold mb-2">
+            Create invitation
+          </h2>
+
+          <p className="text-xs text-neutral-500 mb-4">
+            Generate a single-use invitation token.
+          </p>
+
+          <button
+            onClick={createInvite}
+            disabled={creating}
+            className="px-4 py-2 bg-neutral-900 text-white rounded text-sm disabled:opacity-50"
+          >
+            {creating
+              ? "Creating…"
+              : "Generate Invite"}
+          </button>
+
+
+          {message && (
+            <p className="mt-4 text-xs text-green-700">
+              {message}
+            </p>
+          )}
+
+
+          {error && (
+            <p className="mt-4 text-xs text-red-600">
+              {error}
+            </p>
+          )}
+
+        </div>
+
+
+        <div className="bg-white border border-neutral-300 rounded overflow-hidden">
+
+          <div className="p-5 border-b border-neutral-200">
+
+            <h2 className="font-semibold">
+              Invitations
+            </h2>
+
+            <p className="text-xs text-neutral-500 mt-1">
+              {invites.length} invitation
+              {invites.length === 1
+                ? ""
+                : "s"}
+            </p>
+
+          </div>
+
+
+          {invites.length === 0 ? (
+
+            <div className="p-8 text-center text-sm text-neutral-500">
+              No invitations yet.
+            </div>
+
+          ) : (
+
+            <div className="overflow-x-auto">
+
+              <table className="w-full text-xs">
+
+                <thead>
+                  <tr className="border-b border-neutral-200 text-left">
+
+                    <th className="p-4">
+                      Code
+                    </th>
+
+                    <th className="p-4">
+                      Status
+                    </th>
+
+                    <th className="p-4">
+                      Created
+                    </th>
+
+                    <th className="p-4">
+                      Used by
+                    </th>
+
+                    <th className="p-4">
+                      Used at
+                    </th>
+
+                    <th className="p-4">
+  Actions
+</th>
+
+                  </tr>
+                </thead>
+
+
+                <tbody>
+
+                  {invites.map((invite) => {
+
+                    const status =
+                      invite.status ||
+                      (
+                        invite.used
+                          ? "Used"
+                          : "Available"
+                      );
+
+
+                    return (
+                      <tr
+                        key={invite.id}
+                        className="border-b border-neutral-100"
+                      >
+
+                        <td className="p-4 font-mono">
+                          {invite.token ||
+                            invite.id}
+                        </td>
+
+
+                        <td className="p-4">
+
+                          <span
+  className={
+    status === "used"
+      ? "text-red-700"
+      : status === "revoked"
+      ? "text-neutral-500"
+      : status === "claimed"
+      ? "text-amber-700"
+      : "text-green-700"
+  }
+>
+  {status}
+</span>
+
+                        </td>
+
+
+                        <td className="p-4 text-neutral-500">
+                          {formatDate(
+                            invite.createdAt
+                          )}
+                        </td>
+
+
+                        <td className="p-4">
+                          {invite.usedEmail ||
+                            "—"}
+                        </td>
+
+
+                        <td className="p-4 text-neutral-500">
+                          {formatDate(
+                            invite.usedAt
+                          )}
+                        </td>
+
+
+                        <td className="p-4">
+  {status !== "used" && status !== "revoked" ? (
+    <details className="relative inline-block">
+      <summary className="list-none cursor-pointer select-none text-neutral-500 hover:text-neutral-900">
+        <span className="inline-flex items-center gap-1 px-2 py-1 border border-neutral-200 rounded hover:bg-neutral-50">
+          Actions
+          <span className="text-[10px]">▾</span>
+        </span>
+      </summary>
+
+      <div className="absolute right-0 z-20 mt-1 w-40 bg-white border border-neutral-200 rounded shadow-lg py-1">
+        <button
+          type="button"
+          onClick={() =>
+            copyInviteCode(
+              invite.token || invite.id
+            )
+          }
+          className="w-full text-left px-3 py-2 text-xs text-neutral-700 hover:bg-neutral-50"
+        >
+          Copy code
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            copyInviteLink(
+              invite.token || invite.id
+            )
+          }
+          className="w-full text-left px-3 py-2 text-xs text-neutral-700 hover:bg-neutral-50"
+        >
+          Copy link
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            shareInviteLink(
+              invite.token || invite.id
+            )
+          }
+          className="w-full text-left px-3 py-2 text-xs text-neutral-700 hover:bg-neutral-50"
+        >
+          Share
+        </button>
+
+        <div className="my-1 border-t border-neutral-100" />
+
+        <button
+          type="button"
+          onClick={() =>
+            revokeInvite(invite)
+          }
+          className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+        >
+          Revoke
+        </button>
+      </div>
+    </details>
+  ) : (
+    <span className="text-xs text-neutral-400">
+      —
+    </span>
+  )}
+</td>
+                      </tr>
+                    );
+
+                  })}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          )}
+
+        </div>
+
+      </div>
+
+    </div>
+  );
 }
