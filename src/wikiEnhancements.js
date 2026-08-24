@@ -113,6 +113,16 @@ const getStructureHeadings = (root) => {
   });
 };
 
+let lastStructureRoot = null;
+let lastStructureSignature = null;
+
+const getStructureSignature = (root) => {
+  if (!root) return "";
+  return Array.from(root.querySelectorAll("h2, h3, h4, h5, h6"))
+    .map((heading) => `${heading.tagName}:${heading.textContent.replace(/\s+/g, " ").trim()}`)
+    .join("\u0001");
+};
+
 const buildTree = (container, root) => {
   if (!container) return;
   container.innerHTML = "";
@@ -152,11 +162,18 @@ const buildTree = (container, root) => {
 
 const findBacklinksPanel = () => Array.from(document.querySelectorAll("#root .border-l")).find((element) => element.textContent.includes("Backlinks ("));
 
-const refreshStructure = () => {
+const refreshStructure = (force = false) => {
   const panel = findBacklinksPanel();
   const structure = panel?.querySelector(".archiwiki-structure-content");
+  const root = document.getElementById("print-container");
   if (!structure) return;
-  buildTree(structure, document.getElementById("print-container"));
+
+  const signature = getStructureSignature(root);
+  if (!force && root === lastStructureRoot && signature === lastStructureSignature) return;
+
+  lastStructureRoot = root;
+  lastStructureSignature = signature;
+  buildTree(structure, root);
 };
 
 const enhanceBacklinksPanel = () => {
@@ -196,7 +213,7 @@ const enhanceBacklinksPanel = () => {
     backlinksButton.className = inactive;
     content.classList.add("hidden");
     structure.classList.remove("hidden");
-    refreshStructure();
+    refreshStructure(true);
   });
 
   backlinksButton.addEventListener("click", () => {
@@ -208,7 +225,7 @@ const enhanceBacklinksPanel = () => {
 
   panel.appendChild(structure);
   content.classList.add("hidden");
-  refreshStructure();
+  refreshStructure(true);
 };
 
 let scheduled = false;
