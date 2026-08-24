@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
+import MaintenanceGate from "./components/MaintenanceGate.jsx";
+import AdminMaintenancePanel from "./components/AdminMaintenancePanel.jsx";
 import "./index.css";
 import "./sameNoteAnchors.js";
 import "./wikiEnhancements.js";
@@ -19,13 +21,16 @@ if (pathname === "/invite-admin") {
   root.render(
     <React.StrictMode>
       <App />
+      <AdminMaintenancePanel />
     </React.StrictMode>
   );
 } else {
   root.render(
     <React.StrictMode>
       <AuthProvider>
-        <App />
+        <MaintenanceGate>
+          <App />
+        </MaintenanceGate>
       </AuthProvider>
     </React.StrictMode>
   );
