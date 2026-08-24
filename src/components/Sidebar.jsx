@@ -22,7 +22,8 @@ const sidebarAnimationStyles = `
 export default function Sidebar({
   theme = "beige", folders, notes, activeNoteId,
   onSelectNote, onCreateFolder, onCreateNote,
-  onRenameFolder, onDeleteFolder, onMoveItem, onDeleteNote
+  onRenameFolder, onDeleteFolder, onMoveItem, onDeleteNote,
+  notification = null
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState(() => ({}));
@@ -125,7 +126,23 @@ export default function Sidebar({
       <div className={`p-4 border-b ${colors.brand}`}><h2 className={`text-lg font-semibold tracking-wider font-archi ${colors.brandText}`}>ArchiWiki</h2></div>
       <div className="p-3 flex gap-2"><button type="button" onClick={()=>onCreateFolder(null)} className={`flex-1 py-1 px-2 flex items-center justify-center gap-1.5 text-xs font-medium border rounded ${colors.button}`}><Folder size={12}/>+ Folder</button><button type="button" onClick={()=>onCreateNote(null)} className={`flex-1 py-1 px-2 flex items-center justify-center gap-1.5 text-xs font-medium rounded ${colors.primaryButton}`}><FileText size={12}/>+ Note</button></div>
       <div className="px-3 pb-2 relative"><span className="absolute left-5 top-2 text-neutral-400"><Search size={13}/></span><input type="text" value={searchQuery} onChange={(e)=>setSearchQuery(e.target.value)} placeholder="Search encrypted notes..." className={`w-full text-xs pl-8 pr-3 py-1.5 border rounded focus:outline-none focus:ring-1 ${colors.input}`}/></div>
-      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+      {notification && (
+        <div className="shrink-0 px-3 pb-2">
+          <div
+            role="status"
+            className={`rounded-lg border px-3 py-2.5 text-xs leading-5 shadow-sm pointer-events-none select-none ${
+              notification.priority === "critical"
+                ? "border-red-300 bg-red-50 text-red-900"
+                : notification.priority === "medium"
+                ? "border-yellow-300 bg-yellow-50 text-yellow-900"
+                : `${theme === "charcoal" ? "border-neutral-700 bg-neutral-900 text-neutral-200" : theme === "wikipedia" ? "border-neutral-300 bg-white text-neutral-800" : "border-[#D8CDBA] bg-[#F5F2EB] text-neutral-800"}`
+            }`}
+          >
+            {notification.content}
+          </div>
+        </div>
+      )}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-1">
         {searchQuery ? <div><h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-2">Search Results</h3>{filteredNotes.length>0&&<div><h4 className="text-[9px] uppercase tracking-[0.16em] font-semibold text-neutral-400 px-3 mb-1.5">Files</h4>{filteredNotes.map((note,index)=><div key={note.id} style={{"--archiwiki-delay":`${Math.min(index*35,175)}ms`}} className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${activeNoteId===note.id?colors.activeItem:colors.idleItem}`} onClick={()=>onSelectNote(note.id)}><div className="flex items-center gap-1.5 truncate min-w-0"><FileText size={13} className="shrink-0"/><span className="truncate">{note.title||"Untitled"}</span></div><button type="button" onClick={(e)=>handleDeleteNote(e,note.id)} title="Delete note" aria-label="Delete note" className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={13}/></button></div>)}</div>}{filteredNotes.length>0&&filteredFolders.length>0&&<div className={`my-3 border-t ${colors.divider}`}/>} {filteredFolders.length>0&&<div><h4 className="text-[9px] uppercase tracking-[0.16em] font-semibold text-neutral-400 px-3 mb-1.5">Folders</h4>{filteredFolders.map((folder,index)=><div key={folder.id} style={{"--archiwiki-delay":`${Math.min(index*35,175)}ms`}} onClick={()=>setExpandedFolders((prev)=>({...prev,[folder.id]:true}))} className={`archiwiki-sidebar-item flex items-center gap-1.5 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${colors.folderText}`}><Folder size={13} className={`${colors.folderFill} text-neutral-500 shrink-0`}/><span className="truncate">{folder.name}</span></div>)}</div>}{filteredNotes.length===0&&filteredFolders.length===0&&<p className="text-xs text-neutral-400 px-3 py-2">No results found.</p>}</div> : <>{rootFolders.map((folder)=>renderFolderNode(folder.id))}{rootNotes.length>0&&<div className={`mt-4 border-t ${colors.divider} pt-2`}><h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-1.5">Unsorted Notes</h3>{rootNotes.map((note,index)=><div style={{"--archiwiki-delay":`${Math.min(index*35,175)}ms`}} key={note.id} draggable onDragStart={(e)=>handleDragStart(e,note.id,"note")} onClick={()=>onSelectNote(note.id)} className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${activeNoteId===note.id?colors.activeItem:colors.idleItem}`}><div className="flex items-center gap-1.5 truncate min-w-0"><FileText size={13} className="text-neutral-400 shrink-0"/><span className="truncate">{note.title||"Untitled"}</span></div><button type="button" onClick={(e)=>handleDeleteNote(e,note.id)} title="Delete note" aria-label="Delete note" className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={13}/></button></div>)}</div>}</>}
       </div>
       {contextMenu&&<div className={`fixed z-50 border shadow-lg rounded py-1 w-40 text-xs ${colors.menu}`} style={{top:contextMenu.y,left:contextMenu.x}} onClick={(e)=>e.stopPropagation()}><button type="button" onClick={()=>{onRenameFolder(contextMenu.folderId);closeContextMenu();}} className={`w-full text-left px-3 py-1.5 ${colors.itemHover} flex items-center gap-1.5 ${colors.menuText}`}><Edit2 size={11}/>Rename Folder</button><button type="button" onClick={()=>{onDeleteFolder(contextMenu.folderId);closeContextMenu();}} className={`w-full text-left px-3 py-1.5 ${colors.itemHover} ${colors.menuText} flex items-center gap-1.5`}><Trash2 size={11}/>Delete Recursively</button><button type="button" onClick={()=>{onCreateFolder(contextMenu.folderId);closeContextMenu();}} className={`w-full text-left px-3 py-1.5 ${colors.itemHover} flex items-center gap-1.5 ${colors.menuText}`}><Folder size={11}/>Create Subfolder</button></div>}
