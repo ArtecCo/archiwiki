@@ -137,20 +137,26 @@ export default function Sidebar({
         {searchQuery ? <div><h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-2">Search Results</h3>{filteredNotes.length>0&&<div><h4 className="text-[9px] uppercase tracking-[0.16em] font-semibold text-neutral-400 px-3 mb-1.5">Files</h4>{filteredNotes.map((note,index)=><div key={note.id} style={{"--archiwiki-delay":`${Math.min(index*35,175)}ms`}} className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${activeNoteId===note.id?colors.activeItem:colors.idleItem}`} onClick={()=>onSelectNote(note.id)}><div className="flex items-center gap-1.5 truncate min-w-0"><FileText size={13} className="shrink-0"/><span className="truncate">{note.title||"Untitled"}</span></div><button type="button" onClick={(e)=>handleDeleteNote(e,note.id)} title="Delete note" aria-label="Delete note" className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={13}/></button></div>)}</div>}{filteredNotes.length>0&&filteredFolders.length>0&&<div className={`my-3 border-t ${colors.divider}`}/>} {filteredFolders.length>0&&<div><h4 className="text-[9px] uppercase tracking-[0.16em] font-semibold text-neutral-400 px-3 mb-1.5">Folders</h4>{filteredFolders.map((folder,index)=><div key={folder.id} style={{"--archiwiki-delay":`${Math.min(index*35,175)}ms`}} onClick={()=>setExpandedFolders((prev)=>({...prev,[folder.id]:true}))} className={`archiwiki-sidebar-item flex items-center gap-1.5 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${colors.folderText}`}><Folder size={13} className={`${colors.folderFill} text-neutral-500 shrink-0`}/><span className="truncate">{folder.name}</span></div>)}</div>}{filteredNotes.length===0&&filteredFolders.length===0&&<p className="text-xs text-neutral-400 px-3 py-2">No results found.</p>}</div> : <>{rootFolders.map((folder)=>renderFolderNode(folder.id))}{rootNotes.length>0&&<div className={`mt-4 border-t ${colors.divider} pt-2`}><h3 className="text-[10px] uppercase font-bold tracking-wider text-neutral-400 px-2 mb-1.5">Unsorted Notes</h3>{rootNotes.map((note,index)=><div style={{"--archiwiki-delay":`${Math.min(index*35,175)}ms`}} key={note.id} draggable onDragStart={(e)=>handleDragStart(e,note.id,"note")} onClick={()=>onSelectNote(note.id)} className={`archiwiki-sidebar-item group flex items-center justify-between gap-2 py-1 px-3 ${colors.itemHover} rounded cursor-pointer text-sm ${activeNoteId===note.id?colors.activeItem:colors.idleItem}`}><div className="flex items-center gap-1.5 truncate min-w-0"><FileText size={13} className="text-neutral-400 shrink-0"/><span className="truncate">{note.title||"Untitled"}</span></div><button type="button" onClick={(e)=>handleDeleteNote(e,note.id)} title="Delete note" aria-label="Delete note" className="shrink-0 p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={13}/></button></div>)}</div>}</>}
       </div>
       {notification && (
-        <div className="shrink-0 px-3 py-3 border-t ${colors.divider}">
+        <div className={`shrink-0 w-full px-2 sm:px-3 py-2 sm:py-3 border-t ${colors.divider}`}>
           <div
             role="status"
-            className={`rounded-lg border px-3 py-3 text-xs leading-5 shadow-sm pointer-events-none select-none ${
+            className={`w-full max-w-full overflow-hidden rounded-lg border-2 px-2.5 sm:px-3 py-2.5 sm:py-3 text-xs leading-5 shadow-sm pointer-events-none select-none ${
               notification.priority === "critical"
-                ? "border-red-300 bg-red-50 text-red-900"
+                ? "border-red-600 bg-red-500 text-white"
+                : notification.priority === "high"
+                ? "border-orange-600 bg-orange-500 text-white"
                 : notification.priority === "medium"
-                ? "border-yellow-300 bg-yellow-50 text-yellow-900"
-                : `${theme === "charcoal" ? "border-neutral-700 bg-neutral-900 text-neutral-200" : theme === "wikipedia" ? "border-neutral-300 bg-white text-neutral-800" : "border-[#D8CDBA] bg-[#F5F2EB] text-neutral-800"}`
+                ? "border-yellow-500 bg-yellow-400 text-neutral-950"
+                : theme === "charcoal"
+                ? "border-neutral-500 bg-neutral-800 text-neutral-100"
+                : theme === "wikipedia"
+                ? "border-neutral-400 bg-neutral-100 text-neutral-900"
+                : "border-[#8B7355] bg-[#DCCBA8] text-neutral-950"
             }`}
           >
-            <div className="flex items-start gap-2">
+            <div className="flex min-w-0 items-start gap-2">
               <NotificationIcon size={15} className="shrink-0 mt-0.5" aria-hidden="true" />
-              <span className="min-w-0 break-words">{notification.content}</span>
+              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words overflow-wrap-anywhere">{notification.content}</span>
             </div>
           </div>
         </div>
