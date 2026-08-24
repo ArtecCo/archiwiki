@@ -4,6 +4,7 @@ import App from "./App.jsx";
 import "./index.css";
 import "./sameNoteAnchors.js";
 import "./wikiEnhancements.js";
+import "./uiFixes.js";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
 const root = ReactDOM.createRoot(
@@ -13,9 +14,6 @@ const root = ReactDOM.createRoot(
 const pathname = window.location.pathname;
 
 if (pathname === "/invite-admin") {
-  // IMPORTANT:
-  // The admin panel has its own Firebase Auth handling.
-  // Do NOT put it inside the application's AuthProvider.
   root.render(
     <React.StrictMode>
       <App />
