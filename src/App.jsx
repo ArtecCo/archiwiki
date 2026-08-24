@@ -1180,6 +1180,7 @@ function ArchiWikiApp() {
             <Editor
   theme={theme}
   mobileReaderPanel={mobileReaderPanel}
+  setMobileReaderPanel={setMobileReaderPanel}
   newNoteId={newNoteId}
   note={decryptedNotes.find(
     (note) =>
