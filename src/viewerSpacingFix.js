@@ -9,7 +9,8 @@ const applyViewerSpacing = () => {
     /* The viewer's real scroll workspace is the direct parent of #print-container. */
     div:has(> #print-container) {
       padding-top: 0.75rem !important;
-      padding-bottom: 34px !important;
+      padding-bottom: 12px !important;
+      margin-bottom: 34px !important;
     }
 
     /* Keep the note title itself close to the breadcrumb bar. */
@@ -35,7 +36,8 @@ const applyViewerSpacing = () => {
 
     @media (max-width: 767px) {
       div:has(> #print-container) {
-        padding-bottom: 58px !important;
+        padding-bottom: 12px !important;
+        margin-bottom: 58px !important;
       }
     }
   `;
