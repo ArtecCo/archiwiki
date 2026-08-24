@@ -27,6 +27,7 @@ body {
 textarea,
 .editor-scrollbar,
 .viewer-scrollbar,
+.structure-tree-scrollbar,
 .wiki-content,
 div:has(> #print-container) {
   scrollbar-width: thin;
@@ -36,6 +37,7 @@ div:has(> #print-container) {
 textarea::-webkit-scrollbar,
 .editor-scrollbar::-webkit-scrollbar,
 .viewer-scrollbar::-webkit-scrollbar,
+.structure-tree-scrollbar::-webkit-scrollbar,
 .wiki-content::-webkit-scrollbar,
 div:has(> #print-container)::-webkit-scrollbar {
   width: 4px;
@@ -45,6 +47,7 @@ div:has(> #print-container)::-webkit-scrollbar {
 textarea::-webkit-scrollbar-track,
 .editor-scrollbar::-webkit-scrollbar-track,
 .viewer-scrollbar::-webkit-scrollbar-track,
+.structure-tree-scrollbar::-webkit-scrollbar-track,
 .wiki-content::-webkit-scrollbar-track,
 div:has(> #print-container)::-webkit-scrollbar-track {
   background: transparent;
@@ -53,6 +56,7 @@ div:has(> #print-container)::-webkit-scrollbar-track {
 textarea::-webkit-scrollbar-thumb,
 .editor-scrollbar::-webkit-scrollbar-thumb,
 .viewer-scrollbar::-webkit-scrollbar-thumb,
+.structure-tree-scrollbar::-webkit-scrollbar-thumb,
 .wiki-content::-webkit-scrollbar-thumb,
 div:has(> #print-container)::-webkit-scrollbar-thumb {
   background: #000;
@@ -63,6 +67,7 @@ div:has(> #print-container)::-webkit-scrollbar-thumb {
 textarea::-webkit-scrollbar-thumb:hover,
 .editor-scrollbar::-webkit-scrollbar-thumb:hover,
 .viewer-scrollbar::-webkit-scrollbar-thumb:hover,
+.structure-tree-scrollbar::-webkit-scrollbar-thumb:hover,
 .wiki-content::-webkit-scrollbar-thumb:hover,
 div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
   background: #000;
@@ -72,6 +77,7 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 .dark textarea,
 .dark .editor-scrollbar,
 .dark .viewer-scrollbar,
+.dark .structure-tree-scrollbar,
 .dark .wiki-content,
 .dark div:has(> #print-container) {
   scrollbar-color: #fff transparent;
@@ -80,6 +86,7 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 .dark textarea::-webkit-scrollbar-thumb,
 .dark .editor-scrollbar::-webkit-scrollbar-thumb,
 .dark .viewer-scrollbar::-webkit-scrollbar-thumb,
+.dark .structure-tree-scrollbar::-webkit-scrollbar-thumb,
 .dark .wiki-content::-webkit-scrollbar-thumb,
 .dark div:has(> #print-container)::-webkit-scrollbar-thumb {
   background: #fff;
@@ -88,6 +95,7 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 .dark textarea::-webkit-scrollbar-thumb:hover,
 .dark .editor-scrollbar::-webkit-scrollbar-thumb:hover,
 .dark .viewer-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark .structure-tree-scrollbar::-webkit-scrollbar-thumb:hover,
 .dark .wiki-content::-webkit-scrollbar-thumb:hover,
 .dark div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
   background: #fff;
