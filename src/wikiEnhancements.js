@@ -102,13 +102,23 @@ const wireCrossNoteHeaders = () => {
 };
 
 const getStructureHeadings = (root) => {
+  if (!root) return [];
+
+  // The viewer has a generated H1 containing the note filename/title.
+  // It is presentation chrome, not a Markdown heading. The first real
+  // Markdown heading follows it and must be the first item in Structure.
+  const allHeadings = Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+  const generatedTitle = root.querySelector(":scope > .wiki-content > h1") || root.querySelector(".wiki-content > h1");
+  const markdownHeadings = allHeadings.filter((heading) => heading !== generatedTitle);
+
   const used = new Set();
-  return Array.from(root.querySelectorAll("h2, h3, h4, h5, h6")).map((heading) => {
+  return markdownHeadings.map((heading) => {
     const title = heading.textContent.replace(/\s+/g, " ").trim();
     const base = slugify(title) || "heading";
     let id = base; let n = 2;
     while (used.has(id)) id = `${base}-${n++}`;
-    used.add(id); if (!heading.id) heading.id = id;
+    used.add(id);
+    if (!heading.id) heading.id = id;
     return { heading, title, level: Number(heading.tagName.slice(1)) };
   });
 };
@@ -118,7 +128,8 @@ let lastStructureSignature = null;
 
 const getStructureSignature = (root) => {
   if (!root) return "";
-  return Array.from(root.querySelectorAll("h2, h3, h4, h5, h6"))
+  return Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+    .filter((heading) => heading !== root.querySelector(":scope > .wiki-content > h1") && heading !== root.querySelector(".wiki-content > h1"))
     .map((heading) => `${heading.tagName}:${heading.textContent.replace(/\s+/g, " ").trim()}`)
     .join("\u0001");
 };
@@ -142,7 +153,7 @@ const buildTree = (container, root) => {
   headings.forEach(({ heading, title, level }, index) => {
     const rowWrap = document.createElement("div");
     rowWrap.className = "flex items-stretch";
-    rowWrap.style.paddingLeft = `${Math.max(0, level - 2) * 12}px`;
+    rowWrap.style.paddingLeft = `${Math.max(0, level - 1) * 12}px`;
 
     const guide = document.createElement("div");
     guide.className = "w-3 shrink-0 border-l border-neutral-300/80";
