@@ -293,3 +293,20 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
     height: 0;
   }
 }
+
+/* Hide the structure tree scrollbar at desktop/laptop widths. */
+@media (min-width: 768px) {
+  .structure-tree-scrollbar {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .structure-tree-scrollbar::-webkit-scrollbar,
+  .structure-tree-scrollbar::-webkit-scrollbar-track,
+  .structure-tree-scrollbar::-webkit-scrollbar-thumb {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+    background: transparent !important;
+  }
+}
