@@ -271,30 +271,3 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 .dark .wiki-content hr {
   border-top-color: #525252;
 }
-
-/* Compact horizontal scrollbar used by the mobile metrics strip. */
-.metrics-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #000 transparent;
-}
-
-.metrics-scrollbar::-webkit-scrollbar {
-  height: 3px;
-}
-
-.metrics-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.metrics-scrollbar::-webkit-scrollbar-thumb {
-  background: #000;
-  border-radius: 999px;
-}
-
-.dark .metrics-scrollbar {
-  scrollbar-color: #fff transparent;
-}
-
-.dark .metrics-scrollbar::-webkit-scrollbar-thumb {
-  background: #fff;
-}
