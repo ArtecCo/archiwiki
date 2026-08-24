@@ -257,7 +257,7 @@ const [newInviteToken, setNewInviteToken] = useState("");
         setNotificationEnabled(data.enabled === true);
         setNotificationContent(typeof data.content === "string" ? data.content : "");
         setNotificationPriority(
-          ["low", "medium", "critical"].includes(data.priority) ? data.priority : "low"
+          ["low", "medium", "high", "critical"].includes(data.priority) ? data.priority : "low"
         );
         setNotificationIcon(
           ["Bell", "Megaphone", "Info", "AlertTriangle", "AlertCircle"].includes(data.icon)
@@ -1035,6 +1035,7 @@ const shareInviteLink = async (token) => {
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
+              <option value="high">High</option>
               <option value="critical">Critical</option>
             </select>
 
