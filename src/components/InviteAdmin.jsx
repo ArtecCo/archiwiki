@@ -73,6 +73,11 @@ const [loggingIn, setLoggingIn] = useState(false);
 const [newInviteToken, setNewInviteToken] = useState("");
   const [maintenance, setMaintenance] = useState(false);
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [notificationContent, setNotificationContent] = useState("");
+  const [notificationPriority, setNotificationPriority] = useState("low");
+  const [notificationSaving, setNotificationSaving] = useState(false);
+  const notificationRef = doc(db, "adminMetrics", "notification");
 
   const maintenanceRef = doc(db, "adminMetrics", "maintenance");
 
@@ -244,6 +249,30 @@ const [newInviteToken, setNewInviteToken] = useState("");
     if (!authorized) return;
 
     const unsubscribe = onSnapshot(
+      notificationRef,
+      (snapshot) => {
+        const data = snapshot.exists() ? snapshot.data() : {};
+        setNotificationEnabled(data.enabled === true);
+        setNotificationContent(typeof data.content === "string" ? data.content : "");
+        setNotificationPriority(
+          ["low", "medium", "critical"].includes(data.priority)
+            ? data.priority
+            : "low"
+        );
+      },
+      (err) => {
+        console.error("Failed to load notification status:", err);
+        setError("Unable to read notification settings. Check Firestore rules.");
+      }
+    );
+
+    return unsubscribe;
+  }, [authorized]);
+
+  useEffect(() => {
+    if (!authorized) return;
+
+    const unsubscribe = onSnapshot(
       maintenanceRef,
       (snapshot) => {
         setMaintenance(
@@ -258,6 +287,32 @@ const [newInviteToken, setNewInviteToken] = useState("");
 
     return unsubscribe;
   }, [authorized]);
+
+  const saveNotification = async () => {
+    if (notificationSaving) return;
+
+    setNotificationSaving(true);
+    setError("");
+
+    try {
+      await setDoc(
+        notificationRef,
+        {
+          enabled: notificationEnabled,
+          content: notificationContent.trim(),
+          priority: notificationPriority,
+          updatedAt: Date.now()
+        },
+        { merge: true }
+      );
+      setMessage(notificationEnabled ? "User notification enabled." : "User notification disabled.");
+    } catch (err) {
+      console.error("Failed to update notification:", err);
+      setError(err?.message || "Unable to update user notification.");
+    } finally {
+      setNotificationSaving(false);
+    }
+  };
 
   const toggleMaintenance = async () => {
     if (maintenanceSaving) return;
@@ -927,6 +982,54 @@ const shareInviteLink = async (token) => {
 
 
         <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+          <h2 className="font-semibold mb-2">User notification</h2>
+          <p className="text-xs text-neutral-500 mb-4">
+            Show a read-only notification card above the folders and files for every user.
+          </p>
+
+          <label className="flex items-center gap-3 text-sm mb-4 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={notificationEnabled}
+              onChange={(e) => setNotificationEnabled(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Enable notification
+          </label>
+
+          <textarea
+            value={notificationContent}
+            onChange={(e) => setNotificationContent(e.target.value)}
+            rows={3}
+            maxLength={500}
+            placeholder="Maintenance message for users…"
+            className="w-full border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
+          />
+
+          <div className="mt-3 flex items-center gap-3">
+            <label className="text-xs text-neutral-500">Priority</label>
+            <select
+              value={notificationPriority}
+              onChange={(e) => setNotificationPriority(e.target.value)}
+              className="border border-neutral-300 rounded px-2 py-1.5 text-xs bg-white"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="critical">Critical</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={saveNotification}
+              disabled={notificationSaving}
+              className="ml-auto px-3 py-1.5 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
+            >
+              {notificationSaving ? "Saving…" : "Save notification"}
+            </button>
+          </div>
+        </div>
+
+
 
           <h2 className="font-semibold mb-2">
             Create invitation
