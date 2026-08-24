@@ -4,7 +4,6 @@ import App from "./App.jsx";
 import "./index.css";
 import "./sameNoteAnchors.js";
 import "./wikiEnhancements.js";
-import "./uiFixes.js";
 import "./finalUiFixes.js";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
