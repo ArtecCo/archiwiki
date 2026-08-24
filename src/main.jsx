@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
 import "./sameNoteAnchors.js";
+import "./wikiEnhancements.js";
 import { AuthProvider } from "./context/AuthContext.jsx";
 
 const root = ReactDOM.createRoot(
