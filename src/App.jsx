@@ -904,7 +904,7 @@ function ArchiWikiApp() {
       </div>
 
       {isSidebarOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-[60] md:hidden">
           <button
             type="button"
             aria-label="Close navigation"
@@ -914,7 +914,7 @@ function ArchiWikiApp() {
             className="absolute inset-0 w-full bg-black/40"
           />
 
-          <div className="relative z-10 h-full w-64 shadow-xl">
+          <div className="relative z-[70] h-full w-64 shadow-xl">
             <Sidebar
               theme={theme}
               folders={folders}
