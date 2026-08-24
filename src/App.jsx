@@ -96,7 +96,7 @@ function ArchiWikiApp() {
   }); // beige | wikipedia | charcoal
 
   const [activeTab, setActiveTab] = useState("editor");
-  const [mobileReaderPanel, setMobileReaderPanel] = useState("graph");
+  const [mobileReaderPanel, setMobileReaderPanel] = useState("article");
   const [dialog, setDialog] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -1049,11 +1049,12 @@ function ArchiWikiApp() {
             </button>
 
             <button
-              onClick={() =>
-                setActiveTab("editor")
-              }
+              onClick={() => {
+                setActiveTab("editor");
+                setMobileReaderPanel("article");
+              }}
               className={`px-3 py-1 rounded text-xs font-semibold ${
-                activeTab === "editor"
+                activeTab === "editor" && mobileReaderPanel === "article"
                   ? shellTheme.tabActive
                   : shellTheme.tabIdle
               }`}
@@ -1178,6 +1179,7 @@ function ArchiWikiApp() {
               <div className="flex-1 min-h-0">
             <Editor
   theme={theme}
+  mobileReaderPanel={mobileReaderPanel}
   newNoteId={newNoteId}
   note={decryptedNotes.find(
     (note) =>
