@@ -18,6 +18,62 @@ body {
   font-family: "Montserrat", system-ui, sans-serif;
 }
 
+/* ---------------------------------------------------------
+   THIN THEMED SCROLLBARS
+   --------------------------------------------------------- */
+
+/* Keep the browser's native scrollbar elsewhere. These rules
+   apply only to the markdown editor/viewer scroll containers. */
+.editor-scrollbar,
+.viewer-scrollbar,
+.wiki-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(115, 115, 115, 0.65) transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar,
+.viewer-scrollbar::-webkit-scrollbar,
+.wiki-content::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.editor-scrollbar::-webkit-scrollbar-track,
+.viewer-scrollbar::-webkit-scrollbar-track,
+.wiki-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb,
+.viewer-scrollbar::-webkit-scrollbar-thumb,
+.wiki-content::-webkit-scrollbar-thumb {
+  background: rgba(115, 115, 115, 0.65);
+  border-radius: 999px;
+}
+
+.editor-scrollbar::-webkit-scrollbar-thumb:hover,
+.viewer-scrollbar::-webkit-scrollbar-thumb:hover,
+.wiki-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(82, 82, 82, 0.8);
+}
+
+.dark .editor-scrollbar,
+.dark .viewer-scrollbar,
+.dark .wiki-content {
+  scrollbar-color: rgba(163, 163, 163, 0.6) transparent;
+}
+
+.dark .editor-scrollbar::-webkit-scrollbar-thumb,
+.dark .viewer-scrollbar::-webkit-scrollbar-thumb,
+.dark .wiki-content::-webkit-scrollbar-thumb {
+  background: rgba(163, 163, 163, 0.6);
+}
+
+.dark .editor-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark .viewer-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark .wiki-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 212, 212, 0.75);
+}
 
 // Classes for spacing and links fix
 
