@@ -12,8 +12,7 @@ import {
   Megaphone,
   Info,
   AlertTriangle,
-  TriangleAlert,
-  CircleAlert
+  AlertCircle
 } from "lucide-react";
 
 const sidebarAnimationStyles = `
@@ -76,7 +75,7 @@ export default function Sidebar({
     charcoal: { shell:"border-neutral-800 bg-neutral-950 text-neutral-300", brand:"border-neutral-800", brandText:"text-neutral-100", itemHover:"hover:bg-neutral-800", activeItem:"bg-neutral-800/80 font-medium text-neutral-100", idleItem:"text-neutral-400", folderText:"text-neutral-200", folderFill:"fill-transparent", button:"border-neutral-700 hover:bg-neutral-800", primaryButton:"bg-neutral-100 text-neutral-900 hover:bg-neutral-200", input:"bg-neutral-900 border-neutral-800 focus:ring-neutral-500", divider:"border-neutral-800", menu:"bg-neutral-900 border-neutral-800", menuText:"text-neutral-200" }
   };
   const colors = themeClasses[theme] || themeClasses.beige;
-  const notificationIcons = { Bell, Megaphone, Info, AlertTriangle, TriangleAlert, CircleAlert };
+  const notificationIcons = { Bell, Megaphone, Info, AlertTriangle, AlertCircle };
   const NotificationIcon = notification?.icon && notificationIcons[notification.icon] ? notificationIcons[notification.icon] : Bell;
 
   const toggleFolder = (id) => setExpandedFolders((prev) => ({ ...prev, [id]: !prev[id] }));
