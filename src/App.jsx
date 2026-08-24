@@ -18,7 +18,7 @@ import InviteAdmin from "./components/InviteAdmin";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import GraphView from "./components/GraphView";
-import { LogOut, Share2, Menu } from "lucide-react";
+import { LogOut, Share2, Menu, ListTree, Link2, Network } from "lucide-react";
 
 function ArchiWikiApp() {
   useEffect(() => {
@@ -96,6 +96,7 @@ function ArchiWikiApp() {
   }); // beige | wikipedia | charcoal
 
   const [activeTab, setActiveTab] = useState("editor");
+  const [mobileReaderPanel, setMobileReaderPanel] = useState("graph");
   const [dialog, setDialog] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -1070,8 +1071,62 @@ function ArchiWikiApp() {
                   : shellTheme.tabIdle
               }`}
             >
-              Interactive Graph
+              <span className="hidden md:inline">Interactive Graph</span>
+              <span className="md:hidden">Graph</span>
             </button>
+
+            <div className="md:hidden flex items-center gap-1 ml-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("editor");
+                  setMobileReaderPanel("structure");
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+                  activeTab === "editor" && mobileReaderPanel === "structure"
+                    ? shellTheme.tabActive
+                    : shellTheme.tabIdle
+                }`}
+                aria-label="Open structure"
+              >
+                <ListTree size={13} />
+                <span>Structure</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("editor");
+                  setMobileReaderPanel("links");
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+                  activeTab === "editor" && mobileReaderPanel === "links"
+                    ? shellTheme.tabActive
+                    : shellTheme.tabIdle
+                }`}
+                aria-label="Open links"
+              >
+                <Link2 size={13} />
+                <span>Links</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("graph");
+                  setMobileReaderPanel("graph");
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1 ${
+                  activeTab === "graph" && mobileReaderPanel === "graph"
+                    ? shellTheme.tabActive
+                    : shellTheme.tabIdle
+                }`}
+                aria-label="Open graph"
+              >
+                <Network size={13} />
+                <span>Graph</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 text-xs max-md:w-full max-md:justify-between">
@@ -1136,6 +1191,43 @@ function ArchiWikiApp() {
         {/* Content Render Frame */}
         <div className="flex-1 overflow-hidden">
           {activeTab === "editor" ? (
+            <div className="h-full min-h-0 flex flex-col">
+              <div className="md:hidden shrink-0 border-b px-3 py-1.5 flex items-center gap-1 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setMobileReaderPanel("structure")}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold ${
+                    mobileReaderPanel === "structure"
+                      ? shellTheme.tabActive
+                      : shellTheme.tabIdle
+                  }`}
+                >
+                  Structure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileReaderPanel("links")}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold ${
+                    mobileReaderPanel === "links"
+                      ? shellTheme.tabActive
+                      : shellTheme.tabIdle
+                  }`}
+                >
+                  Links
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileReaderPanel("graph")}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold ${
+                    mobileReaderPanel === "graph"
+                      ? shellTheme.tabActive
+                      : shellTheme.tabIdle
+                  }`}
+                >
+                  Graph
+                </button>
+              </div>
+              <div className="flex-1 min-h-0">
             <Editor
   theme={theme}
   newNoteId={newNoteId}
@@ -1192,6 +1284,8 @@ function ArchiWikiApp() {
     );
   }}
 />
+              </div>
+            </div>
           ) : (
             <GraphView
               theme={theme}
