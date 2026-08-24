@@ -22,57 +22,75 @@ body {
    THIN THEMED SCROLLBARS
    --------------------------------------------------------- */
 
-/* Keep the browser's native scrollbar elsewhere. These rules
-   apply only to the markdown editor/viewer scroll containers. */
+/* Applied statically so the browser never paints its default
+   scrollbar before React's enhancement modules load. */
+textarea,
 .editor-scrollbar,
 .viewer-scrollbar,
-.wiki-content {
+.wiki-content,
+div:has(> #print-container) {
   scrollbar-width: thin;
-  scrollbar-color: rgba(115, 115, 115, 0.65) transparent;
+  scrollbar-color: #000 transparent;
 }
 
+textarea::-webkit-scrollbar,
 .editor-scrollbar::-webkit-scrollbar,
 .viewer-scrollbar::-webkit-scrollbar,
-.wiki-content::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+.wiki-content::-webkit-scrollbar,
+div:has(> #print-container)::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
 
+textarea::-webkit-scrollbar-track,
 .editor-scrollbar::-webkit-scrollbar-track,
 .viewer-scrollbar::-webkit-scrollbar-track,
-.wiki-content::-webkit-scrollbar-track {
+.wiki-content::-webkit-scrollbar-track,
+div:has(> #print-container)::-webkit-scrollbar-track {
   background: transparent;
 }
 
+textarea::-webkit-scrollbar-thumb,
 .editor-scrollbar::-webkit-scrollbar-thumb,
 .viewer-scrollbar::-webkit-scrollbar-thumb,
-.wiki-content::-webkit-scrollbar-thumb {
-  background: rgba(115, 115, 115, 0.65);
+.wiki-content::-webkit-scrollbar-thumb,
+div:has(> #print-container)::-webkit-scrollbar-thumb {
+  background: #000;
   border-radius: 999px;
+  min-height: 20px;
 }
 
+textarea::-webkit-scrollbar-thumb:hover,
 .editor-scrollbar::-webkit-scrollbar-thumb:hover,
 .viewer-scrollbar::-webkit-scrollbar-thumb:hover,
-.wiki-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(82, 82, 82, 0.8);
+.wiki-content::-webkit-scrollbar-thumb:hover,
+div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
+  background: #000;
 }
 
+/* The application uses a .dark ancestor for its charcoal theme. */
+.dark textarea,
 .dark .editor-scrollbar,
 .dark .viewer-scrollbar,
-.dark .wiki-content {
-  scrollbar-color: rgba(163, 163, 163, 0.6) transparent;
+.dark .wiki-content,
+.dark div:has(> #print-container) {
+  scrollbar-color: #fff transparent;
 }
 
+.dark textarea::-webkit-scrollbar-thumb,
 .dark .editor-scrollbar::-webkit-scrollbar-thumb,
 .dark .viewer-scrollbar::-webkit-scrollbar-thumb,
-.dark .wiki-content::-webkit-scrollbar-thumb {
-  background: rgba(163, 163, 163, 0.6);
+.dark .wiki-content::-webkit-scrollbar-thumb,
+.dark div:has(> #print-container)::-webkit-scrollbar-thumb {
+  background: #fff;
 }
 
+.dark textarea::-webkit-scrollbar-thumb:hover,
 .dark .editor-scrollbar::-webkit-scrollbar-thumb:hover,
 .dark .viewer-scrollbar::-webkit-scrollbar-thumb:hover,
-.dark .wiki-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(212, 212, 212, 0.75);
+.dark .wiki-content::-webkit-scrollbar-thumb:hover,
+.dark div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
+  background: #fff;
 }
 
 // Classes for spacing and links fix
