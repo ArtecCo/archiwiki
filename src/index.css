@@ -294,33 +294,16 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
   }
 }
 
-/* Hide the structure tree scrollbar at desktop/laptop widths. */
+
+/* Laptop/desktop structure panel: keep the tree clear of the fixed metrics bar. */
 @media (min-width: 768px) {
-  .structure-tree-scrollbar {
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-  }
-
-  .structure-tree-scrollbar::-webkit-scrollbar,
-  .structure-tree-scrollbar::-webkit-scrollbar-track,
-  .structure-tree-scrollbar::-webkit-scrollbar-thumb {
-    width: 0 !important;
-    height: 0 !important;
-    display: none !important;
-    background: transparent !important;
-  }
-}
-
-/* Laptop only: hide the structure-tree scrollbar and leave enough
-   bottom room to scroll the final heading above the fixed metrics bar. */
-@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .structure-tree-scrollbar {
+  .archiwiki-structure-content.structure-tree-scrollbar {
     scrollbar-width: none !important;
     -ms-overflow-style: none !important;
     padding-bottom: 3.5rem !important;
   }
 
-  .structure-tree-scrollbar::-webkit-scrollbar {
+  .archiwiki-structure-content.structure-tree-scrollbar::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
     height: 0 !important;
