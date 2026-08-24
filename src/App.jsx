@@ -1288,3 +1288,5 @@ function App() {
   if (maintenance) return <MaintenanceScreen theme={theme} />;
   return <ArchiWikiApp />;
 }
+
+export default App;
