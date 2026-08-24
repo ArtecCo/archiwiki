@@ -1029,8 +1029,7 @@ const shareInviteLink = async (token) => {
           </div>
         </div>
 
-
-
+        <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
           <h2 className="font-semibold mb-2">
             Create invitation
           </h2>
