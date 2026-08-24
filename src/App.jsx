@@ -89,6 +89,7 @@ function ArchiWikiApp() {
   const [newNoteId, setNewNoteId] = useState(null);
   const [pendingNotes, setPendingNotes] = useState([]);
   const [fontSize, setFontSize] = useState(16);
+  const [notification, setNotification] = useState(null);
 
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("archiwiki-theme") || "beige";
@@ -173,6 +174,38 @@ function ArchiWikiApp() {
       unsubNotes();
     };
   }, [user]);
+
+  // Load the administrator notification separately from notes/folders.
+  // It is a public, read-only document for normal users.
+  useEffect(() => {
+    const notificationRef = doc(db, "adminMetrics", "notification");
+
+    return onSnapshot(
+      notificationRef,
+      (snap) => {
+        if (!snap.exists()) {
+          setNotification(null);
+          return;
+        }
+
+        const data = snap.data();
+        setNotification(
+          data.enabled === true && typeof data.content === "string" && data.content.trim()
+            ? {
+                content: data.content.trim(),
+                priority: ["low", "medium", "critical"].includes(data.priority)
+                  ? data.priority
+                  : "low"
+              }
+            : null
+        );
+      },
+      (error) => {
+        console.error("Failed to load admin notification:", error);
+        setNotification(null);
+      }
+    );
+  }, []);
 
   // Decrypt notes automatically when masterKey,
   // encryptedNotes, or pendingNotes change.
@@ -810,6 +843,7 @@ function ArchiWikiApp() {
           folders={folders}
           notes={decryptedNotes}
           activeNoteId={activeNoteId}
+          notification={notification}
           onSelectNote={(id) => {
             setNewNoteId(null);
             setActiveNoteId(id);
@@ -883,6 +917,7 @@ function ArchiWikiApp() {
               folders={folders}
               notes={decryptedNotes}
               activeNoteId={activeNoteId}
+              notification={notification}
               onSelectNote={(id) => {
                 setNewNoteId(null);
                 setActiveNoteId(id);
