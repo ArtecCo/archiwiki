@@ -87,5 +87,11 @@ service cloud.firestore {
       allow create, update: if isAdmin();
       allow delete: if false;
     }
+
+    match /adminMetrics/notification {
+      allow get: if true;
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
   }
 }
