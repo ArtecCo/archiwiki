@@ -10,7 +10,8 @@ import {
   doc,
   deleteDoc,
   query,
-  where
+  where,
+  getDoc
 } from "firebase/firestore";
 import { encryptData, decryptData } from "./crypto";
 import InviteAdmin from "./components/InviteAdmin";
@@ -1223,38 +1224,67 @@ function ArchiWikiApp() {
  * either mounts normally with all of its hooks, or does not mount
  * at all when /invite-admin is requested.
  */
-function App() {
-  const pathname = window.location.pathname;
-
-  useEffect(() => {
-    const loader = document.getElementById(
-      "archiwiki-loader"
-    );
-
-    if (!loader) return;
-
-    // /invite-admin does not mount ArchiWikiApp,
-    // so remove the initial HTML loader here.
-    if (pathname === "/invite-admin") {
-      loader.style.opacity = "0";
-      loader.style.visibility = "hidden";
-
-      const timer = setTimeout(() => {
-        loader.remove();
-      }, 450);
-
-      return () => clearTimeout(timer);
-    }
-
-    // Normal routes are handled by ArchiWikiApp's
-    // existing loader-removal effect.
-  }, [pathname]);
-
-  if (pathname === "/invite-admin") {
-    return <InviteAdmin />;
-  }
-
-  return <ArchiWikiApp />;
+function MaintenanceScreen({ theme }) {
+  const dark = theme === "charcoal";
+  const wiki = theme === "wikipedia";
+  return (
+    <div className={"min-h-screen flex items-center justify-center p-6 font-sans " + (dark ? "bg-neutral-900 text-neutral-100" : wiki ? "bg-[#F8F9FA] text-[#202122]" : "bg-[#F5F2EB] text-neutral-800")}>
+      <div className={"w-full max-w-md rounded border p-8 text-center shadow-sm " + (dark ? "border-neutral-700 bg-neutral-950" : wiki ? "border-neutral-300 bg-white" : "border-[#D8CDBA] bg-white")}>
+        <div className="text-2xl mb-4">⚒</div>
+        <h1 className="text-xl font-semibold">We&apos;ll be back shortly</h1>
+        <p className={"mt-3 text-sm leading-6 " + (dark ? "text-neutral-400" : "text-neutral-500")}>
+          ArchiWiki is temporarily unavailable while maintenance is being performed. Please try again shortly.
+        </p>
+      </div>
+    </div>
+  );
 }
 
-export default App;
+function App() {
+  const pathname = window.location.pathname;
+  const [maintenance, setMaintenance] = useState(false);
+  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
+  const [theme] = useState(() => localStorage.getItem("archiwiki-theme") || "beige");
+
+  useEffect(() => {
+    const loader = document.getElementById("archiwiki-loader");
+    if (pathname === "/invite-admin") {
+      if (loader) {
+        loader.style.opacity = "0";
+        loader.style.visibility = "hidden";
+        setTimeout(() => loader.remove(), 450);
+      }
+      setMaintenanceChecked(true);
+      return;
+    }
+    let mounted = true;
+    getDoc(doc(db, "adminMetrics", "maintenance"))
+      .then((snapshot) => {
+        if (!mounted) return;
+        setMaintenance(snapshot.exists() && snapshot.data()?.inMaintenance === true);
+      })
+      .catch((error) => {
+        console.error("Maintenance status check failed:", error);
+        if (mounted) setMaintenance(false);
+      })
+      .finally(() => {
+        if (mounted) setMaintenanceChecked(true);
+      });
+    return () => { mounted = false; };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!maintenanceChecked) return;
+    const loader = document.getElementById("archiwiki-loader");
+    if (!loader) return;
+    loader.style.opacity = "0";
+    loader.style.visibility = "hidden";
+    const timer = setTimeout(() => loader.remove(), 450);
+    return () => clearTimeout(timer);
+  }, [maintenanceChecked]);
+
+  if (pathname === "/invite-admin") return <InviteAdmin />;
+  if (!maintenanceChecked) return null;
+  if (maintenance) return <MaintenanceScreen theme={theme} />;
+  return <ArchiWikiApp />;
+}
