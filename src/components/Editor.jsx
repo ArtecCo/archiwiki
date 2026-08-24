@@ -2465,7 +2465,7 @@ return (
           p-1.5
           ${colors.buttonHover}
           rounded
-          text-neutral-600
+          ${theme === "charcoal" ? "text-neutral-200" : "text-neutral-600"}
           flex items-center gap-1
           text-xs
           shrink-0
