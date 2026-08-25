@@ -13,6 +13,59 @@ const getHeadingText = (heading) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const convertWikiHeadingLinks = (root) => {
+  const containers = root.querySelectorAll(".wiki-content");
+
+  containers.forEach((container) => {
+    const walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          if (parent.closest("pre, code, a")) return NodeFilter.FILTER_REJECT;
+          return /\[\[#[^\]]+\]\]/.test(node.nodeValue || "")
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+
+    const textNodes = [];
+    let node;
+    while ((node = walker.nextNode())) textNodes.push(node);
+
+    textNodes.forEach((textNode) => {
+      const text = textNode.nodeValue || "";
+      const regex = /\[\[#([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+      let lastIndex = 0;
+      let match;
+      const fragment = document.createDocumentFragment();
+      let changed = false;
+
+      while ((match = regex.exec(text))) {
+        changed = true;
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+
+        const link = document.createElement("a");
+        link.href = `#${normalizeAnchor(match[1])}`;
+        link.textContent = (match[2] || match[1]).trim();
+        link.className = "same-note-anchor text-green-600 italic";
+        link.dataset.sameNoteAnchor = "true";
+        fragment.appendChild(link);
+
+        lastIndex = regex.lastIndex;
+      }
+
+      if (!changed) return;
+
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+      textNode.parentNode.replaceChild(fragment, textNode);
+    });
+  });
+};
+
 const enhanceSameNoteAnchors = () => {
   const root = document.getElementById("root");
   if (!root) return;
@@ -37,6 +90,8 @@ const enhanceSameNoteAnchors = () => {
     byAnchor.set(normalizeAnchor(text), heading);
   });
 
+  convertWikiHeadingLinks(root);
+
   root.querySelectorAll('a[href^="#"]').forEach((link) => {
     const rawTarget = link.getAttribute("href");
     if (!rawTarget || rawTarget === "#") return;
@@ -53,8 +108,6 @@ const enhanceSameNoteAnchors = () => {
       link.setAttribute("href", `#${resolvedId}`);
     }
 
-    // Keep same-note links visually consistent with the app's green links,
-    // while distinguishing them with italic text.
     link.classList.add("text-green-600", "italic");
 
     if (link.dataset.sameNoteAnchorBound === "true") return;
