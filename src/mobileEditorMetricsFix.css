@@ -16,10 +16,12 @@
     min-width: 0;
     padding-bottom: 0 !important;
   }
-}
 
-@media (max-width: 639px) {
+  /* Reserve the metrics bar inside the workspace rather than adding
+     an external margin. This keeps the editor boundary correct while
+     allowing the workspace to follow Android Chrome's dynamic viewport. */
   .editor-workspace {
-    margin-bottom: var(--editor-metrics-height, 0px);
+    box-sizing: border-box;
+    padding-bottom: var(--editor-metrics-height, 0px);
   }
 }
