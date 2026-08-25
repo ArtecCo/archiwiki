@@ -75,6 +75,26 @@ export default function Sidebar({
     });
   }, [activeNoteId, notes, folders]);
 
+  useEffect(() => {
+  if (!contextMenu) return;
+
+  const handleOutsideClick = (event) => {
+    const menu = event.target.closest(".archiwiki-context-menu");
+
+    // Clicking inside the context menu should NOT close it.
+    if (menu) return;
+
+    setContextMenu(null);
+    setMoveMenuOpen(false);
+  };
+
+  document.addEventListener("mousedown", handleOutsideClick);
+
+  return () => {
+    document.removeEventListener("mousedown", handleOutsideClick);
+  };
+}, [contextMenu]);
+
   const themeClasses = {
     beige: { shell:"border-[#E6E1D3] bg-[#EFEADF] text-neutral-700", brand:"border-[#E6E1D3]", brandText:"text-neutral-900", itemHover:"hover:bg-[#E8E1D2]", activeItem:"bg-[#E2D9C8] font-medium text-neutral-900", idleItem:"text-neutral-600", folderText:"text-neutral-800", folderFill:"fill-[#E2D9C8]", button:"border-[#D8CDBA] hover:bg-[#E8E1D2]", primaryButton:"bg-neutral-900 text-neutral-100 hover:bg-neutral-800", input:"bg-[#F5F2EB] border-[#D8CDBA] focus:ring-neutral-400", divider:"border-[#E6E1D3]", menu:"bg-[#F5F2EB] border-[#D8CDBA]", menuText:"text-neutral-700" },
     wikipedia: { shell:"border-neutral-200 bg-neutral-50 text-neutral-700", brand:"border-neutral-200", brandText:"text-neutral-900", itemHover:"hover:bg-neutral-100", activeItem:"bg-neutral-200/70 font-medium text-neutral-900", idleItem:"text-neutral-600", folderText:"text-neutral-800", folderFill:"fill-neutral-200", button:"border-neutral-300 hover:bg-neutral-100", primaryButton:"bg-neutral-900 text-neutral-100 hover:bg-neutral-800", input:"bg-white border-neutral-200 focus:ring-neutral-400", divider:"border-neutral-100", menu:"bg-white border-neutral-200", menuText:"text-neutral-700" },
@@ -187,7 +207,7 @@ export default function Sidebar({
           </div>
         </div>
       )}
-      {contextMenu&&<div className={`fixed z-50 border shadow-lg rounded py-1 w-44 text-xs ${colors.menu}`} style={{top:Math.min(contextMenu.y,window.innerHeight-260),left:Math.min(contextMenu.x,window.innerWidth-190)}} onClick={(e)=>e.stopPropagation()}>
+      {contextMenu&&<div className={`archiwiki-context-menu fixed z-50 border shadow-lg rounded py-1 w-44 text-xs ${colors.menu}`} style={{top:Math.min(contextMenu.y,window.innerHeight-260),left:Math.min(contextMenu.x,window.innerWidth-190)}} onClick={(e)=>e.stopPropagation()}>
         {contextMenu.type === "folder" ? <>
           <button type="button" onClick={()=>{onRenameFolder(contextMenu.id);closeContextMenu();}} className={`w-full text-left px-3 py-1.5 ${colors.itemHover} flex items-center gap-1.5 ${colors.menuText}`}><Edit2 size={11}/>Rename Folder</button>
           <button type="button" onClick={()=>{onDeleteFolder(contextMenu.id);closeContextMenu();}} className={`w-full text-left px-3 py-1.5 ${colors.itemHover} ${colors.menuText} flex items-center gap-1.5`}><Trash2 size={11}/>Delete Recursively</button>
