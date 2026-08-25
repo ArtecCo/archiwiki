@@ -1,0 +1,23 @@
+/* Phone-only editor safe area.
+   The metrics bar itself is intentionally untouched. */
+@media (max-width: 639px) {
+  /* Keep the editor inside the viewport and leave enough scrollable
+     space for the fixed metrics bar at the bottom. */
+  textarea {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding-bottom: 6rem !important;
+    overflow-x: hidden;
+  }
+
+  /* If the editor uses a scroll wrapper, give the wrapper the same
+     bottom safe area without changing its desktop behaviour. */
+  .editor-scrollbar {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    padding-bottom: 6rem !important;
+  }
+}
