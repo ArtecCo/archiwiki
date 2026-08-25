@@ -80,7 +80,7 @@ const convertWikiHeadingLinks = (root) => {
           const parent = node.parentElement;
           if (!parent) return NodeFilter.FILTER_REJECT;
           if (parent.closest("pre, code, a")) return NodeFilter.FILTER_REJECT;
-          return /\[\[#[^\]]+\]\]/.test(node.nodeValue || "")
+          return /\[\[#(?:[^\]]+)\]\]/.test(node.nodeValue || "")
             ? NodeFilter.FILTER_ACCEPT
             : NodeFilter.FILTER_REJECT;
         }
@@ -123,12 +123,36 @@ const convertWikiHeadingLinks = (root) => {
   });
 };
 
+/*
+ * The Markdown renderer currently turns [[#Heading]] into a
+ * .wiki-link-missing span before this enhancement module runs. Recover those
+ * simple same-note links here by matching the rendered label to a heading.
+ */
+const convertMissingWikiHeadingLinks = (root, byAnchor) => {
+  root.querySelectorAll(".wiki-link-missing").forEach((span) => {
+    if (span.closest("pre, code, a")) return;
+
+    const target = normalizeAnchor(span.textContent);
+    const heading = byAnchor.get(target);
+    if (!heading) return;
+
+    const link = document.createElement("a");
+    link.href = `#${heading.id}`;
+    link.textContent = span.textContent.trim();
+    link.className = "same-note-anchor text-green-600 italic";
+    link.dataset.sameNoteAnchor = "true";
+    span.replaceWith(link);
+  });
+};
+
 const enhanceSameNoteAnchors = () => {
   const root = document.getElementById("root");
   if (!root) return;
 
   const headings = Array.from(
-    root.querySelectorAll("#print-container h1, #print-container h2, #print-container h3, #print-container h4, #print-container h5, #print-container h6")
+    root.querySelectorAll(
+      "#print-container h1, #print-container h2, #print-container h3, #print-container h4, #print-container h5, #print-container h6"
+    )
   );
 
   const used = new Map();
@@ -153,6 +177,7 @@ const enhanceSameNoteAnchors = () => {
   });
 
   convertWikiHeadingLinks(root);
+  convertMissingWikiHeadingLinks(root, byAnchor);
 
   root.querySelectorAll('a[href^="#"]').forEach((link) => {
     const rawTarget = link.getAttribute("href");
@@ -173,7 +198,11 @@ const enhanceSameNoteAnchors = () => {
       link.setAttribute("href", `#${resolvedId}`);
     }
 
-    link.classList.add("text-green-600", "italic");
+    link.classList.add("same-note-anchor");
+    link.style.cursor = "pointer";
+    link.style.pointerEvents = "auto";
+    link.style.textDecoration = "underline";
+    link.style.textUnderlineOffset = "2px";
   });
 };
 
