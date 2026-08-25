@@ -247,20 +247,6 @@ useEffect(() => {
   };
 }, []);
 
-  updateMetricsHeight();
-
-  const observer = new ResizeObserver(updateMetricsHeight);
-  const bar = document.getElementById("editor-metrics-bar");
-
-  if (bar) observer.observe(bar);
-
-  window.addEventListener("resize", updateMetricsHeight);
-
-  return () => {
-    observer.disconnect();
-    window.removeEventListener("resize", updateMetricsHeight);
-  };
-}, []);
 
   useEffect(() => {
     if (!note || newNoteId !== note.id) return;
