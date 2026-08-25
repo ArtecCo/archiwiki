@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { scrollToHeading } from "../sameNoteAnchors";
 import { marked } from "marked";
 import { jsPDF } from "jspdf";
 import {
@@ -2305,11 +2306,15 @@ let renderedHtml = marked.parse(protectedMarkdown, {
                     const targetIndex = index;
                     setMobileReaderPanel?.("article");
                     window.setTimeout(() => {
-                      document
-                        .getElementById("print-container")
-                        ?.querySelectorAll("h1,h2,h3,h4,h5,h6")
-                        ?.[targetIndex]?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }, 50);
+  const heading = document
+    .getElementById("print-container")
+    ?.querySelectorAll("h1,h2,h3,h4,h5,h6")
+    ?.[targetIndex];
+
+  if (heading) {
+    scrollToHeading(heading);
+  }
+}, 50);
                   }}
                   className={`w-full text-left py-2 rounded px-2 ${colors.buttonHover}`}
                   style={{ paddingLeft: `${8 + (heading.level - 1) * 14}px` }}
