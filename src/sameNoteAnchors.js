@@ -13,6 +13,61 @@ const getHeadingText = (heading) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const getViewerScroller = (heading) => {
+  let node = heading?.parentElement;
+
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (
+      (style.overflowY === "auto" || style.overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight
+    ) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+
+  return null;
+};
+
+const scrollToHeading = (heading) => {
+  if (!heading) return;
+
+  const scroller = getViewerScroller(heading);
+
+  if (scroller) {
+    const scrollerRect = scroller.getBoundingClientRect();
+    const headingRect = heading.getBoundingClientRect();
+    const targetTop =
+      scroller.scrollTop +
+      (headingRect.top - scrollerRect.top) -
+      16;
+
+    scroller.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: "smooth"
+    });
+  } else {
+    heading.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  heading.classList.remove("archiwiki-anchor-highlight");
+  void heading.offsetWidth;
+  heading.classList.add("archiwiki-anchor-highlight");
+  window.setTimeout(
+    () => heading.classList.remove("archiwiki-anchor-highlight"),
+    1100
+  );
+
+  if (heading.id) {
+    window.history.replaceState(
+      null,
+      "",
+      `#${encodeURIComponent(heading.id)}`
+    );
+  }
+};
+
 const convertWikiHeadingLinks = (root) => {
   const containers = root.querySelectorAll(".wiki-content");
 
@@ -46,7 +101,9 @@ const convertWikiHeadingLinks = (root) => {
 
       while ((match = regex.exec(text))) {
         changed = true;
-        fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+        fragment.appendChild(
+          document.createTextNode(text.slice(lastIndex, match.index))
+        );
 
         const link = document.createElement("a");
         link.href = `#${normalizeAnchor(match[1])}`;
@@ -70,7 +127,10 @@ const enhanceSameNoteAnchors = () => {
   const root = document.getElementById("root");
   if (!root) return;
 
-  const headings = Array.from(root.querySelectorAll("h1, h2, h3, h4, h5, h6"));
+  const headings = Array.from(
+    root.querySelectorAll("#print-container h1, #print-container h2, #print-container h3, #print-container h4, #print-container h5, #print-container h6")
+  );
+
   const used = new Map();
   const byAnchor = new Map();
 
@@ -83,7 +143,9 @@ const enhanceSameNoteAnchors = () => {
     const count = used.get(base) || 0;
     used.set(base, count + 1);
 
-    if (!existing) heading.id = count === 0 ? base : `${base}-${count + 1}`;
+    if (!existing) {
+      heading.id = count === 0 ? base : `${base}-${count + 1}`;
+    }
 
     const finalId = heading.id;
     byAnchor.set(normalizeAnchor(finalId), heading);
@@ -97,8 +159,11 @@ const enhanceSameNoteAnchors = () => {
     if (!rawTarget || rawTarget === "#") return;
 
     let target;
-    try { target = decodeURIComponent(rawTarget.slice(1)); }
-    catch { target = rawTarget.slice(1); }
+    try {
+      target = decodeURIComponent(rawTarget.slice(1));
+    } catch {
+      target = rawTarget.slice(1);
+    }
 
     const heading = byAnchor.get(normalizeAnchor(target));
     if (!heading) return;
@@ -109,23 +174,38 @@ const enhanceSameNoteAnchors = () => {
     }
 
     link.classList.add("text-green-600", "italic");
+  });
+};
 
-    if (link.dataset.sameNoteAnchorBound === "true") return;
-    link.dataset.sameNoteAnchorBound = "true";
+const bindSameNoteLinkClicks = () => {
+  const root = document.getElementById("root");
+  if (!root || root.dataset.sameNoteClickBound === "true") return;
 
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      heading.scrollIntoView({ behavior: "smooth", block: "start" });
+  root.dataset.sameNoteClickBound = "true";
 
-      heading.classList.remove("archiwiki-anchor-highlight");
-      void heading.offsetWidth;
-      heading.classList.add("archiwiki-anchor-highlight");
-      window.setTimeout(() => heading.classList.remove("archiwiki-anchor-highlight"), 1100);
+  root.addEventListener("click", (event) => {
+    const link = event.target.closest?.('a[href^="#"]');
+    if (!link || !root.contains(link)) return;
 
-      if (resolvedId) {
-        window.history.replaceState(null, "", `#${encodeURIComponent(resolvedId)}`);
-      }
-    });
+    const href = link.getAttribute("href");
+    if (!href || href === "#") return;
+
+    const target = normalizeAnchor(href.slice(1));
+    const headings = root.querySelectorAll(
+      "#print-container h1, #print-container h2, #print-container h3, #print-container h4, #print-container h5, #print-container h6"
+    );
+
+    const heading = Array.from(headings).find(
+      (candidate) =>
+        normalizeAnchor(candidate.id) === target ||
+        normalizeAnchor(getHeadingText(candidate)) === target
+    );
+
+    if (!heading) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    scrollToHeading(heading);
   });
 };
 
@@ -143,6 +223,7 @@ const injectHighlightStyle = () => {
     .archiwiki-anchor-highlight {
       animation: archiwikiAnchorPulse 1s ease-in-out;
       border-radius: 0.2rem;
+      scroll-margin-top: 16px;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -161,10 +242,14 @@ const startSameNoteAnchors = () => {
   if (typeof document === "undefined") return;
 
   injectHighlightStyle();
-  enhanceSameNoteAnchors();
 
   const root = document.getElementById("root");
-  if (!root || observer) return;
+  if (!root) return;
+
+  bindSameNoteLinkClicks();
+  enhanceSameNoteAnchors();
+
+  if (observer) return;
 
   observer = new MutationObserver(() => enhanceSameNoteAnchors());
   observer.observe(root, { childList: true, subtree: true });
