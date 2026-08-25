@@ -51,14 +51,6 @@ const scrollToHeading = (heading) => {
     () => heading.classList.remove("archiwiki-anchor-highlight"),
     1100
   );
-
-  if (heading.id) {
-    window.history.replaceState(
-      null,
-      "",
-      `#${encodeURIComponent(heading.id)}`
-    );
-  }
 };
 
 /*
