@@ -15,36 +15,29 @@ const getHeadingText = (heading) =>
 
 const getViewerScroller = (heading) => {
   let node = heading?.parentElement;
-
   while (node && node !== document.body) {
     const style = window.getComputedStyle(node);
     if (
       (style.overflowY === "auto" || style.overflowY === "scroll") &&
       node.scrollHeight > node.clientHeight
-    ) {
-      return node;
-    }
+    ) return node;
     node = node.parentElement;
   }
-
   return null;
 };
 
 const scrollToHeading = (heading) => {
   if (!heading) return;
-
   const scroller = getViewerScroller(heading);
 
   if (scroller) {
     const scrollerRect = scroller.getBoundingClientRect();
     const headingRect = heading.getBoundingClientRect();
-    const targetTop =
-      scroller.scrollTop +
-      (headingRect.top - scrollerRect.top) -
-      16;
-
     scroller.scrollTo({
-      top: Math.max(0, targetTop),
+      top: Math.max(
+        0,
+        scroller.scrollTop + (headingRect.top - scrollerRect.top) - 16
+      ),
       behavior: "smooth"
     });
   } else {
@@ -68,19 +61,22 @@ const scrollToHeading = (heading) => {
   }
 };
 
-const convertWikiHeadingLinks = (root) => {
-  const containers = root.querySelectorAll(".wiki-content");
-
-  containers.forEach((container) => {
+/*
+ * ArchiWiki underline syntax: ++text++
+ * This is deliberately not applied inside code or links.
+ */
+const convertUnderlineSyntax = (root) => {
+  root.querySelectorAll(".wiki-content").forEach((container) => {
     const walker = document.createTreeWalker(
       container,
       NodeFilter.SHOW_TEXT,
       {
         acceptNode(node) {
           const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          if (parent.closest("pre, code, a")) return NodeFilter.FILTER_REJECT;
-          return /\[\[#(?:[^\]]+)\]\]/.test(node.nodeValue || "")
+          if (!parent || parent.closest("pre, code, a, u")) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return /\+\+[^+\n]+\+\+/.test(node.nodeValue || "")
             ? NodeFilter.FILTER_ACCEPT
             : NodeFilter.FILTER_REJECT;
         }
@@ -93,11 +89,11 @@ const convertWikiHeadingLinks = (root) => {
 
     textNodes.forEach((textNode) => {
       const text = textNode.nodeValue || "";
-      const regex = /\[\[#([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+      const regex = /\+\+([^+\n]+)\+\+/g;
       let lastIndex = 0;
       let match;
-      const fragment = document.createDocumentFragment();
       let changed = false;
+      const fragment = document.createDocumentFragment();
 
       while ((match = regex.exec(text))) {
         changed = true;
@@ -105,43 +101,16 @@ const convertWikiHeadingLinks = (root) => {
           document.createTextNode(text.slice(lastIndex, match.index))
         );
 
-        const link = document.createElement("a");
-        link.href = `#${normalizeAnchor(match[1])}`;
-        link.textContent = (match[2] || match[1]).trim();
-        link.className = "same-note-anchor text-green-600 italic";
-        link.dataset.sameNoteAnchor = "true";
-        fragment.appendChild(link);
-
+        const underline = document.createElement("u");
+        underline.textContent = match[1];
+        fragment.appendChild(underline);
         lastIndex = regex.lastIndex;
       }
 
       if (!changed) return;
-
       fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
       textNode.parentNode.replaceChild(fragment, textNode);
     });
-  });
-};
-
-/*
- * The Markdown renderer currently turns [[#Heading]] into a
- * .wiki-link-missing span before this enhancement module runs. Recover those
- * simple same-note links here by matching the rendered label to a heading.
- */
-const convertMissingWikiHeadingLinks = (root, byAnchor) => {
-  root.querySelectorAll(".wiki-link-missing").forEach((span) => {
-    if (span.closest("pre, code, a")) return;
-
-    const target = normalizeAnchor(span.textContent);
-    const heading = byAnchor.get(target);
-    if (!heading) return;
-
-    const link = document.createElement("a");
-    link.href = `#${heading.id}`;
-    link.textContent = span.textContent.trim();
-    link.className = "same-note-anchor text-green-600 italic";
-    link.dataset.sameNoteAnchor = "true";
-    span.replaceWith(link);
   });
 };
 
@@ -171,14 +140,11 @@ const enhanceSameNoteAnchors = () => {
       heading.id = count === 0 ? base : `${base}-${count + 1}`;
     }
 
-    const finalId = heading.id;
-    byAnchor.set(normalizeAnchor(finalId), heading);
+    byAnchor.set(normalizeAnchor(heading.id), heading);
     byAnchor.set(normalizeAnchor(text), heading);
   });
 
-  convertWikiHeadingLinks(root);
-  convertMissingWikiHeadingLinks(root, byAnchor);
-
+  /* Same-note links are standard Markdown only: [SMON](#SMON). */
   root.querySelectorAll('a[href^="#"]').forEach((link) => {
     const rawTarget = link.getAttribute("href");
     if (!rawTarget || rawTarget === "#") return;
@@ -193,23 +159,18 @@ const enhanceSameNoteAnchors = () => {
     const heading = byAnchor.get(normalizeAnchor(target));
     if (!heading) return;
 
-    const resolvedId = heading.id;
-    if (resolvedId && link.getAttribute("href") !== `#${resolvedId}`) {
-      link.setAttribute("href", `#${resolvedId}`);
-    }
-
+    if (heading.id) link.setAttribute("href", `#${heading.id}`);
     link.classList.add("same-note-anchor");
     link.style.cursor = "pointer";
     link.style.pointerEvents = "auto";
-    link.style.textDecoration = "underline";
-    link.style.textUnderlineOffset = "2px";
   });
+
+  convertUnderlineSyntax(root);
 };
 
 const bindSameNoteLinkClicks = () => {
   const root = document.getElementById("root");
   if (!root || root.dataset.sameNoteClickBound === "true") return;
-
   root.dataset.sameNoteClickBound = "true";
 
   root.addEventListener("click", (event) => {
@@ -231,7 +192,6 @@ const bindSameNoteLinkClicks = () => {
     );
 
     if (!heading) return;
-
     event.preventDefault();
     event.stopPropagation();
     scrollToHeading(heading);
@@ -248,13 +208,11 @@ const injectHighlightStyle = () => {
       0%, 100% { background-color: transparent; }
       25%, 65% { background-color: rgba(34, 197, 94, 0.24); }
     }
-
     .archiwiki-anchor-highlight {
       animation: archiwikiAnchorPulse 1s ease-in-out;
       border-radius: 0.2rem;
       scroll-margin-top: 16px;
     }
-
     @media (prefers-reduced-motion: reduce) {
       .archiwiki-anchor-highlight {
         animation: none;
@@ -269,7 +227,6 @@ let observer;
 
 const startSameNoteAnchors = () => {
   if (typeof document === "undefined") return;
-
   injectHighlightStyle();
 
   const root = document.getElementById("root");
@@ -279,7 +236,6 @@ const startSameNoteAnchors = () => {
   enhanceSameNoteAnchors();
 
   if (observer) return;
-
   observer = new MutationObserver(() => enhanceSameNoteAnchors());
   observer.observe(root, { childList: true, subtree: true });
 };
