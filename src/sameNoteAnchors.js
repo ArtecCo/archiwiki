@@ -26,7 +26,7 @@ const getViewerScroller = (heading) => {
   return null;
 };
 
-const scrollToHeading = (heading) => {
+export const scrollToHeading = (heading) => {
   if (!heading) return;
   const scroller = getViewerScroller(heading);
 
@@ -136,7 +136,6 @@ const enhanceSameNoteAnchors = () => {
     byAnchor.set(normalizeAnchor(text), heading);
   });
 
-  /* Same-note links are standard Markdown only: [SMON](#SMON). */
   root.querySelectorAll('a[href^="#"]').forEach((link) => {
     const rawTarget = link.getAttribute("href");
     if (!rawTarget || rawTarget === "#") return;
