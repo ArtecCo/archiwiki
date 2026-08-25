@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="ArchiWiki">
+  <rect width="512" height="512" rx="84" fill="#F5F2EB"/>
+  <path d="M256 64 448 256 256 448 64 256 256 64Z" fill="none" stroke="#3F372B" stroke-width="18"/>
+  <path d="M173 355 235 157h42l62 198h-40l-14-48h-70l-14 48h-28Zm65-83h39l-20-70-19 70Z" fill="#3F372B"/>
+</svg>
