@@ -1,19 +1,16 @@
 /*
- * Preserve the editor's actual document position across Edit, toolbar
- * mutations, and Save without producing a visible scroll-to-top flash.
+ * Preserve the user's visual document position across editor mode changes.
  *
- * There are two different scroll owners:
- *   - reading mode: the main editor workspace
- *   - editing mode: the textarea itself
- *
- * We intentionally capture only around deliberate editor actions. We do not
- * observe mutations or continuously force scrollTop, so normal typing and
- * scrolling remain completely native.
+ * Edit and Save replace the scrollable DOM surface (viewer <-> textarea),
+ * while toolbar actions usually keep the same surface. We capture all three
+ * possible scroll owners before React handles the click and restore them
+ * after the render. Window/document scroll is included because some layouts
+ * can temporarily move the browser viewport when focus changes.
  */
 
-let savedScrollTop = null;
-let savedNoteKey = null;
-let savedScrollOwner = null;
+let savedWorkspaceScrollTop = null;
+let savedTextareaScrollTop = null;
+let savedWindowScrollY = null;
 let restoreTimers = [];
 
 const clearRestoreTimers = () => {
@@ -27,8 +24,8 @@ const getEditorWorkspace = () => {
   const textarea = getTextarea();
 
   if (textarea) {
-    const workspace = textarea.parentElement?.parentElement;
-    if (workspace) return workspace;
+    const candidate = textarea.parentElement?.parentElement;
+    if (candidate) return candidate;
   }
 
   const viewer = document.getElementById("print-container");
@@ -52,95 +49,61 @@ const getEditorWorkspace = () => {
   return null;
 };
 
-const getNoteKey = () => {
-  const hashNote = new URLSearchParams(
-    window.location.hash.replace(/^#/, "")
-  ).get("note");
+const capturePosition = () => {
+  const workspace = getEditorWorkspace();
+  const textarea = getTextarea();
 
-  const viewerTitle = document
-    .querySelector("#print-container h1")
-    ?.textContent
-    ?.trim();
+  savedWorkspaceScrollTop = workspace?.scrollTop ?? null;
+  savedTextareaScrollTop = textarea?.scrollTop ?? null;
+  savedWindowScrollY = window.scrollY;
 
-  const editorTitle = document
-    .querySelector('input[placeholder="Title your note"]')
-    ?.value
-    ?.trim();
-
-  return String(
-    hashNote || viewerTitle || editorTitle || ""
-  ).toLowerCase();
+  return (
+    savedWorkspaceScrollTop !== null ||
+    savedTextareaScrollTop !== null ||
+    savedWindowScrollY !== null
+  );
 };
 
-const capturePosition = () => {
-  const textarea = getTextarea();
-  const workspace = getEditorWorkspace();
-  const key = getNoteKey();
+const clampScroll = (value, element) => {
+  if (value === null || value === undefined || !element) return;
 
-  if (!key) return false;
-
-  savedNoteKey = key;
-
-  if (textarea) {
-    savedScrollOwner = "textarea";
-    savedScrollTop = textarea.scrollTop;
-  } else if (workspace) {
-    savedScrollOwner = "workspace";
-    savedScrollTop = workspace.scrollTop;
-  } else {
-    savedScrollOwner = null;
-    savedScrollTop = null;
-  }
-
-  return savedScrollTop !== null;
+  element.scrollTop = Math.min(
+    Math.max(0, value),
+    Math.max(0, element.scrollHeight - element.clientHeight)
+  );
 };
 
 const restorePosition = () => {
-  if (
-    !savedNoteKey ||
-    savedScrollTop === null ||
-    !savedScrollOwner
-  ) {
-    return;
-  }
-
-  if (getNoteKey() !== savedNoteKey) return;
-
-  const textarea = getTextarea();
   const workspace = getEditorWorkspace();
+  const textarea = getTextarea();
 
   /*
-   * The important detail is that the saved value follows the semantic
-   * document position, not the old DOM element. Therefore:
-   *
-   *   viewer -> Edit: workspace position becomes textarea position
-   *   editing -> toolbar: textarea position stays textarea position
-   *   editing -> Save: textarea position becomes workspace position
+   * Restore window/document scrolling first. This prevents the browser's
+   * focus/DOM replacement from leaving the viewport at y=0.
    */
-  const target = Math.max(0, savedScrollTop);
+  if (savedWindowScrollY !== null) {
+    window.scrollTo(0, savedWindowScrollY);
 
-  if (textarea && savedScrollOwner === "textarea") {
-    textarea.scrollTop = Math.min(
-      target,
-      Math.max(0, textarea.scrollHeight - textarea.clientHeight)
-    );
-  } else if (!textarea && workspace && savedScrollOwner === "workspace") {
-    workspace.scrollTop = Math.min(
-      target,
-      Math.max(0, workspace.scrollHeight - workspace.clientHeight)
-    );
-  } else if (textarea && savedScrollOwner === "workspace") {
-    /* Entering Edit: the document's scrollable surface changes. */
-    textarea.scrollTop = Math.min(
-      target,
-      Math.max(0, textarea.scrollHeight - textarea.clientHeight)
-    );
-  } else if (!textarea && workspace && savedScrollOwner === "textarea") {
-    /* Saving: the document's scrollable surface changes back. */
-    workspace.scrollTop = Math.min(
-      target,
-      Math.max(0, workspace.scrollHeight - workspace.clientHeight)
-    );
+    if (document.scrollingElement) {
+      document.scrollingElement.scrollTop = savedWindowScrollY;
+    }
+  }
+
+  /*
+   * The same numeric document position is intentionally transferred between
+   * the viewer workspace and textarea. This is what makes Edit and Save feel
+   * like a mode switch rather than navigation to a new page.
+   */
+  if (textarea && savedTextareaScrollTop !== null) {
+    clampScroll(savedTextareaScrollTop, textarea);
+  }
+
+  if (workspace && savedWorkspaceScrollTop !== null) {
+    clampScroll(savedWorkspaceScrollTop, workspace);
+  } else if (workspace && savedTextareaScrollTop !== null) {
+    clampScroll(savedTextareaScrollTop, workspace);
+  } else if (textarea && savedWorkspaceScrollTop !== null) {
+    clampScroll(savedWorkspaceScrollTop, textarea);
   }
 };
 
@@ -148,15 +111,17 @@ const scheduleRestore = () => {
   clearRestoreTimers();
 
   /*
-   * A single-frame restore removes the visible flash. The short follow-ups
-   * cover React's commit plus the Firestore-backed Save update without
-   * continuously fighting the browser.
+   * The first restore happens on the next paint, before the user can perceive
+   * the newly mounted surface. Later restores cover React's commit and any
+   * asynchronous Save/state update without continuously fighting scrolling.
    */
   requestAnimationFrame(restorePosition);
 
-  [0, 50, 120].forEach((delay) => {
+  [0, 16, 40, 80, 140, 240, 400].forEach((delay) => {
     restoreTimers.push(
-      setTimeout(() => requestAnimationFrame(restorePosition), delay)
+      setTimeout(() => {
+        requestAnimationFrame(restorePosition);
+      }, delay)
     );
   });
 };
@@ -214,7 +179,7 @@ const bind = () => {
 
       if (!isEditOrSave && !isEditorToolbarButton(button)) return;
 
-      /* Capture before React's onClick/onPointer processing changes the DOM. */
+      /* Capture BEFORE React's click handler changes isEditing/DOM. */
       if (capturePosition()) {
         scheduleRestore();
       }
