@@ -52,6 +52,7 @@ const initInstallPrompt = () => {
   if (typeof window === "undefined" || isStandalone()) return;
 
   let deferredPrompt = null;
+  let promptInProgress = false;
   const button = createInstallButton();
 
   const hide = () => {
@@ -62,7 +63,29 @@ const initInstallPrompt = () => {
     button.style.display = "block";
   };
 
+  const launchNativePrompt = async () => {
+    if (!deferredPrompt || promptInProgress) return false;
+
+    promptInProgress = true;
+    const promptEvent = deferredPrompt;
+    deferredPrompt = null;
+    hide();
+
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+    } catch {
+      // The browser may reject a prompt if its install criteria changed.
+    } finally {
+      promptInProgress = false;
+    }
+
+    return true;
+  };
+
   window.addEventListener("beforeinstallprompt", (event) => {
+    // Keep the browser's install event until the user performs a gesture.
+    // Calling prompt() without a user activation is rejected by Chromium.
     event.preventDefault();
     deferredPrompt = event;
     show();
@@ -70,17 +93,7 @@ const initInstallPrompt = () => {
 
   button.addEventListener("click", async () => {
     if (deferredPrompt) {
-      const promptEvent = deferredPrompt;
-      deferredPrompt = null;
-      hide();
-
-      try {
-        await promptEvent.prompt();
-        await promptEvent.userChoice;
-      } catch {
-        // The browser controls whether the native prompt can be shown.
-      }
-
+      await launchNativePrompt();
       return;
     }
 
@@ -88,6 +101,19 @@ const initInstallPrompt = () => {
       showIOSInstructions();
     }
   });
+
+  // If the browser has already made an install event available before the
+  // listener above was attached, give the user a gesture-based fallback.
+  const gestureFallback = async () => {
+    if (deferredPrompt) {
+      await launchNativePrompt();
+      window.removeEventListener("pointerdown", gestureFallback, true);
+      window.removeEventListener("keydown", gestureFallback, true);
+    }
+  };
+
+  window.addEventListener("pointerdown", gestureFallback, true);
+  window.addEventListener("keydown", gestureFallback, true);
 
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
