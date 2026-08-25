@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import MaintenanceGate from "./components/MaintenanceGate.jsx";
 import "./index.css";
+import "./mobileEditorMetricsFix.css";
 import "./sameNoteAnchors.js";
 import "./wikiEnhancements.js";
 import "./finalUiFixes.js";
