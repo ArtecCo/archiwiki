@@ -265,6 +265,21 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
   cursor: default;
 }
 
+/* Same-note links: restore the original italic green-accent treatment. */
+.wiki-content .same-note-anchor {
+  color: #2E8B57;
+  font-style: italic;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.wiki-content .same-note-anchor:hover {
+  color: #246B45;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 /* Dark theme */
 
 .dark .wiki-content .wiki-link {
@@ -273,6 +288,14 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 
 .dark .wiki-content .wiki-link:hover {
   color: #bfdbfe;
+}
+
+.dark .wiki-content .same-note-anchor {
+  color: #86efac;
+}
+
+.dark .wiki-content .same-note-anchor:hover {
+  color: #bbf7d0;
 }
 
 .dark .wiki-content blockquote {
