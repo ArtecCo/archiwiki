@@ -2674,7 +2674,9 @@ return (
     {/* WORKING DESK                                       */}
     {/* -------------------------------------------------- */}
 
-    <div className="flex-1 min-h-0 min-w-0 flex overflow-hidden pb-0">
+    <div
+  className="editor-workspace flex-1 min-h-0 min-w-0 flex overflow-hidden pb-0"
+>
 
       {/* ------------------------------------------------ */}
       {/* MAIN WORKSPACE                                   */}
@@ -2979,6 +2981,7 @@ return (
 {/* -------------------------------------------------- */}
 
 <div
+  id="editor-metrics-bar"
   className={`
     fixed md:absolute
     bottom-0 left-0 right-0
