@@ -247,9 +247,6 @@ useEffect(() => {
   };
 }, []);
 
-  ...
-}, []);
-
   updateMetricsHeight();
 
   const observer = new ResizeObserver(updateMetricsHeight);
