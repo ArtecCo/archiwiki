@@ -170,8 +170,8 @@ export default function Editor({
     setIsEditing(false);
   }, [note?.id]);
 
-  useEffect(() => {
-  const updateMetricsHeight = () => {
+useEffect(() => {
+  const updateEditorViewport = () => {
     const bar = document.getElementById("editor-metrics-bar");
 
     if (bar) {
@@ -180,7 +180,75 @@ export default function Editor({
         `${bar.offsetHeight}px`
       );
     }
+
+    if (
+      typeof window !== "undefined" &&
+      window.visualViewport
+    ) {
+      document.documentElement.style.setProperty(
+        "--editor-visual-height",
+        `${window.visualViewport.height}px`
+      );
+    }
   };
+
+  updateEditorViewport();
+
+  const observer = new ResizeObserver(
+    updateEditorViewport
+  );
+
+  const bar = document.getElementById(
+    "editor-metrics-bar"
+  );
+
+  if (bar) {
+    observer.observe(bar);
+  }
+
+  window.addEventListener(
+    "resize",
+    updateEditorViewport
+  );
+
+  const viewport = window.visualViewport;
+
+  if (viewport) {
+    viewport.addEventListener(
+      "resize",
+      updateEditorViewport
+    );
+
+    viewport.addEventListener(
+      "scroll",
+      updateEditorViewport
+    );
+  }
+
+  return () => {
+    observer.disconnect();
+
+    window.removeEventListener(
+      "resize",
+      updateEditorViewport
+    );
+
+    if (viewport) {
+      viewport.removeEventListener(
+        "resize",
+        updateEditorViewport
+      );
+
+      viewport.removeEventListener(
+        "scroll",
+        updateEditorViewport
+      );
+    }
+  };
+}, []);
+
+  ...
+}, []);
 
   updateMetricsHeight();
 
@@ -2465,11 +2533,12 @@ return (
   <div
     className={`relative flex-1 min-h-0 flex flex-col h-full overflow-hidden ${colors.page}`}
     style={{
-      fontFamily: "Montserrat, sans-serif",
-      height: "100%",
-      minHeight: 0,
-      maxHeight: "100dvh"
-    }}
+  fontFamily: "Montserrat, sans-serif",
+  height: "100%",
+  minHeight: 0,
+  maxHeight:
+    "var(--editor-visual-height, 100dvh)"
+}}
   >
 {/* -------------------------------------------------- */}
 {/* EDITOR CONTEXT MENU                                */}
@@ -2830,12 +2899,14 @@ return (
               placeholder="Write your thoughts... Type '[[' to link pages."
               className={`flex-1 min-h-0 min-w-0 w-full bg-transparent resize-none focus:outline-none font-mono focus:ring-0 leading-relaxed whitespace-pre-wrap break-words ${colors.input}`}
               style={{
-                overflowX: "hidden",
-                overflowY: "auto",
-                overflowWrap: "anywhere",
-                wordBreak: "break-word",
-                whiteSpace: "pre-wrap"
-              }}
+  overflowX: "hidden",
+  overflowY: "auto",
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+  whiteSpace: "pre-wrap",
+  paddingBottom:
+    "var(--editor-metrics-height, 0px)"
+}}
             />
 
             {/* WIKI AUTOCOMPLETE */}
