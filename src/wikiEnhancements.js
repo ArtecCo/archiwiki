@@ -3,6 +3,8 @@
  * PDF generation, storage and existing wiki-link rendering untouched.
  */
 
+import { scrollToHeading } from "./sameNoteAnchors";
+
 const WIKI_CAPTURE_RE = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]$/;
 const WIKI_PLACEHOLDER_RE = /WIKILINKPLACEHOLDER(\d+)WIKILINKPLACEHOLDER/g;
 const originalReplace = String.prototype.replace;
@@ -201,8 +203,7 @@ const buildTree = (container, source) => {
         jumpToEditHeading({ lineIndex, textarea });
         return;
       }
-      heading.scrollIntoView({ behavior: "smooth", block: "start" });
-      highlightHeading(heading);
+      scrollToHeading(heading);
     });
     rowWrap.append(guide, row);
     list.appendChild(rowWrap);
