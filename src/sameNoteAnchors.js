@@ -196,6 +196,9 @@ const injectHighlightStyle = () => {
   const style = document.createElement("style");
   style.id = "archiwiki-anchor-highlight-style";
   style.textContent = `
+    .same-note-anchor::before {
+      content: "#";
+    }
     @keyframes archiwikiAnchorPulse {
       0%, 100% { background-color: transparent; }
       25%, 65% { background-color: rgba(34, 197, 94, 0.24); }
