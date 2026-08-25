@@ -2,7 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-*{
+*
+{
   user-select: none;
 }
 
@@ -193,6 +194,14 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 
 .wiki-content code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Code inside fenced blocks already inherits the block's background. */
+.wiki-content pre code {
+  background: transparent;
+  border-radius: 0;
 }
 
 .wiki-content hr {
@@ -265,6 +274,14 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 
 .dark .wiki-content pre {
   background: rgba(255, 255, 255, 0.08);
+}
+
+.dark .wiki-content code {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dark .wiki-content pre code {
+  background: transparent;
 }
 
 .dark .wiki-content th,
