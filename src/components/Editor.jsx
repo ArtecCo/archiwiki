@@ -170,6 +170,33 @@ export default function Editor({
   }, [note?.id]);
 
   useEffect(() => {
+  const updateMetricsHeight = () => {
+    const bar = document.getElementById("editor-metrics-bar");
+
+    if (bar) {
+      document.documentElement.style.setProperty(
+        "--editor-metrics-height",
+        `${bar.offsetHeight}px`
+      );
+    }
+  };
+
+  updateMetricsHeight();
+
+  const observer = new ResizeObserver(updateMetricsHeight);
+  const bar = document.getElementById("editor-metrics-bar");
+
+  if (bar) observer.observe(bar);
+
+  window.addEventListener("resize", updateMetricsHeight);
+
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("resize", updateMetricsHeight);
+  };
+}, []);
+
+  useEffect(() => {
     if (!note || newNoteId !== note.id) return;
 
     setIsEditing(true);
