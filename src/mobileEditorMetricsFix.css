@@ -17,3 +17,9 @@
     padding-bottom: 0 !important;
   }
 }
+
+@media (max-width: 639px) {
+  .editor-workspace {
+    margin-bottom: var(--editor-metrics-height, 0px);
+  }
+}
