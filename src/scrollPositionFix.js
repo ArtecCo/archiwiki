@@ -1,44 +1,42 @@
-/* Additive scroll-position preservation. Does not modify Editor.jsx. */
-
 /*
- * Important:
- * Do NOT continuously restore scroll position with a MutationObserver.
- * React mutates the DOM while the user types, and restoring on every
- * mutation makes the textarea jump back to the position where Edit was hit.
+ * Preserve the editor workspace scroll position across React renders that
+ * replace the viewer/textarea, including toolbar actions and Save.
  *
- * We only capture/restore around the two deliberate mode transitions:
- * View -> Edit and Edit -> Save -> View.
+ * The workspace itself owns the page scroll. The textarea owns its own text
+ * scroll while editing, so both are tracked independently.
  */
 
-let savedScrollTop = null;
+let savedWorkspaceScrollTop = null;
+let savedTextareaScrollTop = null;
 let savedNoteKey = null;
 let restoreTimer = null;
 
-const getScrollContainer = () => {
+const getEditorWorkspace = () => {
   const textarea = document.querySelector("textarea");
-  if (textarea && textarea.offsetParent !== null) return textarea;
+  if (textarea) {
+    const workspace = textarea.parentElement?.parentElement;
+    if (workspace) return workspace;
+  }
 
   const viewer = document.getElementById("print-container");
-  if (viewer) {
-    let node = viewer.parentElement;
+  if (!viewer) return null;
 
-    while (node && node !== document.body) {
-      const style = window.getComputedStyle(node);
-
-      if (
-        (style.overflowY === "auto" ||
-          style.overflowY === "scroll") &&
-        node.scrollHeight > node.clientHeight
-      ) {
-        return node;
-      }
-
-      node = node.parentElement;
+  let node = viewer.parentElement;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (
+      (style.overflowY === "auto" || style.overflowY === "scroll") &&
+      node.scrollHeight > node.clientHeight
+    ) {
+      return node;
     }
+    node = node.parentElement;
   }
 
   return null;
 };
+
+const getTextarea = () => document.querySelector("textarea");
 
 const getNoteKey = () => {
   const viewerTitle = document
@@ -55,56 +53,79 @@ const getNoteKey = () => {
 };
 
 const savePosition = () => {
-  const container = getScrollContainer();
+  const workspace = getEditorWorkspace();
+  const textarea = getTextarea();
   const key = getNoteKey();
 
-  if (!container || !key) return;
+  if (!key) return;
 
-  savedScrollTop = container.scrollTop;
   savedNoteKey = key;
+  savedWorkspaceScrollTop = workspace?.scrollTop ?? null;
+  savedTextareaScrollTop = textarea?.scrollTop ?? null;
 };
 
 const restorePosition = () => {
-  if (savedScrollTop === null || !savedNoteKey) return;
+  if (!savedNoteKey) return;
 
-  const container = getScrollContainer();
   const key = getNoteKey();
+  if (!key || key !== savedNoteKey) return;
 
-  if (!container || key !== savedNoteKey) return;
-
-  const target = savedScrollTop;
+  const workspaceTarget = savedWorkspaceScrollTop;
+  const textareaTarget = savedTextareaScrollTop;
 
   clearTimeout(restoreTimer);
 
   const apply = () => {
-    const current = getScrollContainer();
+    if (getNoteKey() !== savedNoteKey) return;
 
-    if (!current || getNoteKey() !== savedNoteKey) return;
+    const workspace = getEditorWorkspace();
+    const textarea = getTextarea();
 
-    current.scrollTop = Math.min(
-      target,
-      Math.max(0, current.scrollHeight - current.clientHeight)
-    );
+    if (workspace && workspaceTarget !== null) {
+      workspace.scrollTop = Math.min(
+        workspaceTarget,
+        Math.max(0, workspace.scrollHeight - workspace.clientHeight)
+      );
+    }
+
+    if (textarea && textareaTarget !== null) {
+      textarea.scrollTop = Math.min(
+        textareaTarget,
+        Math.max(0, textarea.scrollHeight - textarea.clientHeight)
+      );
+    }
   };
 
-  // React needs to finish replacing the viewer/editor before the
-  // saved scroll position can be applied.
   apply();
   requestAnimationFrame(apply);
+  requestAnimationFrame(() => requestAnimationFrame(apply));
+  restoreTimer = setTimeout(apply, 120);
+};
 
-  restoreTimer = setTimeout(apply, 100);
+const isEditorToolbarButton = (button) => {
+  if (!button || !button.closest("textarea") === false) return false;
+
+  const title = button.getAttribute("title")?.trim().toLowerCase();
+  return [
+    "bold",
+    "italic",
+    "heading",
+    "bulleted list",
+    "numbered list",
+    "quote",
+    "code",
+    "link"
+  ].includes(title);
 };
 
 const bind = () => {
   const root = document.getElementById("root");
-
   if (!root) return;
 
   root.addEventListener(
-    "click",
+    "pointerdown",
     (event) => {
       const button = event.target.closest?.("button");
-
       if (!button) return;
 
       const label = button.textContent
@@ -112,16 +133,18 @@ const bind = () => {
         .trim()
         .toLowerCase();
 
-      if (label !== "edit" && label !== "save") return;
+      const isEditOrSave = label === "edit" || label === "save";
+      const isToolbar = isEditorToolbarButton(button);
+
+      if (!isEditOrSave && !isToolbar) return;
 
       /*
-       * Capture immediately before the mode transition.
-       * After this point the user is free to scroll and type;
-       * nothing will overwrite or restore this value until the
-       * next deliberate Edit/Save transition.
+       * Capture before the button's React handler runs. This matters because
+       * toolbar actions call setBody(), and Save changes the note snapshot.
        */
       savePosition();
 
+      // Let React complete its state update before restoring both scrollers.
       requestAnimationFrame(restorePosition);
       setTimeout(restorePosition, 0);
       setTimeout(restorePosition, 100);
@@ -133,9 +156,7 @@ const bind = () => {
 
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bind, {
-      once: true
-    });
+    document.addEventListener("DOMContentLoaded", bind, { once: true });
   } else {
     bind();
   }
