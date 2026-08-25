@@ -194,12 +194,14 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 
 .wiki-content code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 0.1rem 0.3rem;
   border-radius: 0.5rem;
   background: rgba(0, 0, 0, 0.06);
 }
 
 /* Code inside fenced blocks already inherits the block's background. */
 .wiki-content pre code {
+  padding: 0;
   background: transparent;
   border-radius: 0;
 }
