@@ -2,8 +2,8 @@
  * Preserve the editor workspace scroll position across React renders that
  * replace the viewer/textarea, including toolbar actions and Save.
  *
- * The workspace itself owns the page scroll. The textarea owns its own text
- * scroll while editing, so both are tracked independently.
+ * The workspace owns the page scroll. The textarea owns its own text scroll
+ * while editing, so both are tracked independently.
  */
 
 let savedWorkspaceScrollTop = null;
@@ -39,6 +39,10 @@ const getEditorWorkspace = () => {
 const getTextarea = () => document.querySelector("textarea");
 
 const getNoteKey = () => {
+  const hashNote = new URLSearchParams(
+    window.location.hash.replace(/^#/, "")
+  ).get("note");
+
   const viewerTitle = document
     .querySelector("#print-container h1")
     ?.textContent
@@ -49,7 +53,9 @@ const getNoteKey = () => {
     ?.value
     ?.trim();
 
-  return (viewerTitle || editorTitle || "").toLowerCase();
+  return String(
+    hashNote || viewerTitle || editorTitle || ""
+  ).toLowerCase();
 };
 
 const savePosition = () => {
@@ -103,7 +109,7 @@ const restorePosition = () => {
 };
 
 const isEditorToolbarButton = (button) => {
-  if (!button || !button.closest("textarea") === false) return false;
+  if (!button) return false;
 
   const title = button.getAttribute("title")?.trim().toLowerCase();
   return [
@@ -138,13 +144,10 @@ const bind = () => {
 
       if (!isEditOrSave && !isToolbar) return;
 
-      /*
-       * Capture before the button's React handler runs. This matters because
-       * toolbar actions call setBody(), and Save changes the note snapshot.
-       */
+      /* Capture before React's handler runs. */
       savePosition();
 
-      // Let React complete its state update before restoring both scrollers.
+      // Restore after React has completed its state update and DOM replacement.
       requestAnimationFrame(restorePosition);
       setTimeout(restorePosition, 0);
       setTimeout(restorePosition, 100);
