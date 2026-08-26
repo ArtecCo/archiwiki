@@ -172,7 +172,9 @@ export default function Editor({
 
 useEffect(() => {
   const updateEditorViewport = () => {
-    const bar = document.getElementById("editor-metrics-bar");
+    const bar = document.getElementById(
+      "editor-metrics-bar"
+    );
 
     if (bar) {
       document.documentElement.style.setProperty(
@@ -185,9 +187,21 @@ useEffect(() => {
       typeof window !== "undefined" &&
       window.visualViewport
     ) {
+      const viewport = window.visualViewport;
+
       document.documentElement.style.setProperty(
         "--editor-visual-height",
-        `${window.visualViewport.height}px`
+        `${viewport.height}px`
+      );
+
+      document.documentElement.style.setProperty(
+        "--editor-keyboard-offset",
+        `${Math.max(
+          0,
+          window.innerHeight -
+            viewport.height -
+            viewport.offsetTop
+        )}px`
       );
     }
   };
@@ -2519,8 +2533,6 @@ return (
   fontFamily: "Montserrat, sans-serif",
   height: "100%",
   minHeight: 0,
-  maxHeight:
-    "var(--editor-visual-height, 100dvh)"
 }}
   >
 {/* -------------------------------------------------- */}
@@ -2888,7 +2900,7 @@ return (
   wordBreak: "break-word",
   whiteSpace: "pre-wrap",
   paddingBottom:
-    "var(--editor-metrics-height, 0px)"
+    "1rem"
 }}
             />
 
@@ -3070,17 +3082,19 @@ return (
   id="editor-metrics-bar"
   className={`
     fixed md:absolute
-    bottom-0 left-0 right-0
-    z-40
-    shrink-0
+  left-0 right-0
+  z-40
+  shrink-0
     border-t ${colors.border}
     ${colors.status}
     font-sans text-[11px] text-neutral-500
   `}
-  style={{
-    paddingBottom:
-      "env(safe-area-inset-bottom)"
-  }}
+ style={{
+  bottom:
+    "var(--editor-keyboard-offset, 0px)",
+  paddingBottom:
+    "env(safe-area-inset-bottom)"
+}}
 >
   <div className="w-full overflow-x-auto">
     <div
