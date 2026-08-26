@@ -141,27 +141,11 @@ const isEditorToolbarButton = (button) => {
   ].includes(title);
 };
 
-const preventTextareaFocusScroll = () => {
-  if (window.__archiwikiPreventTextareaFocusScroll) return;
-
-  const nativeFocus = HTMLTextAreaElement.prototype.focus;
-
-  HTMLTextAreaElement.prototype.focus = function (options) {
-    if (options === undefined) {
-      return nativeFocus.call(this, { preventScroll: true });
-    }
-
-    return nativeFocus.call(this, options);
-  };
-
-  window.__archiwikiPreventTextareaFocusScroll = true;
-};
 
 const bind = () => {
   const root = document.getElementById("root");
   if (!root) return;
 
-  preventTextareaFocusScroll();
 
   root.addEventListener(
     "pointerdown",
