@@ -1019,140 +1019,229 @@ let renderedHtml = marked.parse(protectedMarkdown, {
     ...palette.text
   );
 
-  const drawInline = (line, startX, startY) => {
-    const pattern =
-      /(`[^`\n]+`|\+\+[^+\n]+\+\+)/g;
+const drawInline = (line, startX, startY) => {
+  const pattern =
+    /(`[^`\n]+`|\+\+[^+\n]+\+\+)/g;
 
-    let cursor = 0;
-    let currentX = startX;
-    let match;
+  let cursor = 0;
+  let currentX = startX;
+  let match;
 
-    while (
-      (match = pattern.exec(line)) !== null
-    ) {
-      const before =
-  plainInline(
-    line.slice(cursor, match.index)
-  );
+  const normalSize = size;
+  const codeSize = size * 0.78;
 
-if (before) {
-  pdf.setFont(font, style);
+  while (
+    (match = pattern.exec(line)) !== null
+  ) {
+    /*
+     * -------------------------------------------------------
+     * NORMAL TEXT BEFORE INLINE SEGMENT
+     * -------------------------------------------------------
+     */
 
-  pdf.text(
-    before,
-    currentX,
-    startY
-  );
+    const before =
+      plainInline(
+        line.slice(cursor, match.index)
+      );
 
-  currentX += pdf.getTextWidth(
-    before
-  );
-}
+    if (before) {
+      pdf.setFont(font, style);
+      pdf.setFontSize(normalSize);
+      pdf.setTextColor(...palette.text);
 
-      const token = match[0];
+      pdf.text(
+        before,
+        currentX,
+        startY
+      );
 
-      if (token.startsWith("`")) {
-  const codeText =
-    token.slice(1, -1);
-
-  pdf.setFont(
-    "courier",
-    "normal"
-  );
-
-  pdf.setFontSize(size*0.78);
-
-  const codeWidth =
-    pdf.getTextWidth(codeText);
-
-  const horizontalPadding = 1.2;
-  const backgroundHeight = 4.6;
-  const backgroundY =
-    startY - 3.5;
-
-  // Inline-code background
-  pdf.setFillColor(
-    235,
-    235,
-    235
-  );
-
-  pdf.roundedRect(
-    currentX - horizontalPadding,
-    backgroundY,
-    codeWidth +
-      horizontalPadding * 2,
-    backgroundHeight,
-    1,
-    1,
-    "F"
-  );
-
-  // Inline-code text
-  pdf.setTextColor(
-    ...palette.text
-  );
-
-  pdf.text(
-    codeText,
-    currentX,
-    startY
-  );
-
-  currentX +=
-    codeWidth +
-    horizontalPadding * 2;
-} else {
-        const underlineText =
-          token.slice(2, -2);
-
-        pdf.setFont(font, style);
-
-        pdf.text(
-          underlineText,
-          currentX,
-          startY
-        );
-
-        const textWidth =
-          pdf.getTextWidth(
-            underlineText
-          );
-
-        pdf.setLineWidth(0.2);
-
-        pdf.line(
-          currentX,
-          startY + 0.8,
-          currentX + textWidth,
-          startY + 0.8
-        );
-
-        currentX += textWidth;
-      }
-
-      cursor =
-        match.index + token.length;
+      currentX += pdf.getTextWidth(
+        before
+      );
     }
 
-    const remaining =
-  line.slice(cursor);
+    const token = match[0];
 
-if (remaining) {
-  const cleanedRemaining =
-    plainInline(remaining);
+    /*
+     * -------------------------------------------------------
+     * INLINE CODE
+     * -------------------------------------------------------
+     */
 
-  if (cleanedRemaining) {
-    pdf.setFont(font, style);
+    if (token.startsWith("`")) {
+      const codeText =
+        token.slice(1, -1);
 
-    pdf.text(
-      cleanedRemaining,
-      currentX,
-      startY
+      /*
+       * Inline code behaves like its own
+       * independent styled span.
+       */
+
+      pdf.setFont(
+        "courier",
+        "normal"
+      );
+
+      pdf.setFontSize(codeSize);
+      pdf.setTextColor(...palette.text);
+
+      const codeWidth =
+        pdf.getTextWidth(codeText);
+
+      const horizontalPadding = 1.2;
+      const backgroundHeight = 4.2;
+      const backgroundY =
+        startY - 3.1;
+
+      /*
+       * Background
+       */
+      pdf.setFillColor(
+        235,
+        235,
+        235
+      );
+
+      pdf.roundedRect(
+        currentX - horizontalPadding,
+        backgroundY,
+        codeWidth +
+          horizontalPadding * 2,
+        backgroundHeight,
+        1,
+        1,
+        "F"
+      );
+
+      /*
+       * Code text
+       */
+      pdf.setFont(
+        "courier",
+        "normal"
+      );
+
+      pdf.setFontSize(codeSize);
+      pdf.setTextColor(...palette.text);
+
+      pdf.text(
+        codeText,
+        currentX,
+        startY
+      );
+
+      currentX +=
+        codeWidth +
+        horizontalPadding * 2;
+    }
+
+    /*
+     * -------------------------------------------------------
+     * UNDERLINED TEXT
+     * -------------------------------------------------------
+     */
+
+    else {
+      const underlineText =
+        token.slice(2, -2);
+
+      pdf.setFont(
+        font,
+        style
+      );
+
+      pdf.setFontSize(
+        normalSize
+      );
+
+      pdf.setTextColor(
+        ...palette.text
+      );
+
+      pdf.text(
+        underlineText,
+        currentX,
+        startY
+      );
+
+      const textWidth =
+        pdf.getTextWidth(
+          underlineText
+        );
+
+      pdf.setLineWidth(0.2);
+
+      pdf.line(
+        currentX,
+        startY + 0.8,
+        currentX + textWidth,
+        startY + 0.8
+      );
+
+      currentX += textWidth + 1.2;
+    }
+
+    cursor =
+      match.index +
+      token.length;
+
+    /*
+     * -------------------------------------------------------
+     * IMPORTANT:
+     * Restore the normal paragraph
+     * font after every inline segment.
+     * -------------------------------------------------------
+     */
+
+    pdf.setFont(
+      font,
+      style
+    );
+
+    pdf.setFontSize(
+      normalSize
+    );
+
+    pdf.setTextColor(
+      ...palette.text
     );
   }
-}
-  };
+
+  /*
+   * ---------------------------------------------------------
+   * REMAINING NORMAL TEXT
+   * ---------------------------------------------------------
+   */
+
+  const remaining =
+    line.slice(cursor);
+
+  if (remaining) {
+    const cleanedRemaining =
+      plainInline(remaining);
+
+    if (cleanedRemaining) {
+      pdf.setFont(
+        font,
+        style
+      );
+
+      pdf.setFontSize(
+        normalSize
+      );
+
+      pdf.setTextColor(
+        ...palette.text
+      );
+
+      pdf.text(
+        cleanedRemaining,
+        currentX,
+        startY
+      );
+    }
+  }
+};
 
   lines.forEach(
     (line, index) => {
