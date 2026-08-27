@@ -2088,34 +2088,6 @@ const shareInviteLink = async (token) => {
       </div>
 
       {/* Add new admin comment */}
-      {feedbackCommentsLoading[item.id] ? (
-  <p className="mt-4 text-xs text-neutral-500">
-    Loading comments…
-  </p>
-) : (
-  <div className="mt-4 space-y-2">
-    {(feedbackComments[item.id] || []).length === 0 ? (
-      <p className="text-xs text-neutral-500">
-        No admin comments yet.
-      </p>
-    ) : (
-      (feedbackComments[item.id] || []).map((comment) => (
-        <div
-          key={comment.id}
-          className="p-3 bg-neutral-50 border border-neutral-200 rounded"
-        >
-          <p className="text-sm whitespace-pre-wrap">
-            {comment.text}
-          </p>
-
-          <p className="mt-1 text-[11px] text-neutral-400">
-            Admin · {formatDate(comment.createdAt)}
-          </p>
-        </div>
-      ))
-    )}
-  </div>
-)}
 
 <div className="mt-4">
   <textarea
