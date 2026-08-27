@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookOpen, RefreshCw } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { marked } from "marked";
@@ -56,8 +56,340 @@ export default function Guide({ theme = "beige" }) {
     loadGuide();
   }, [user]);
 
+  /*
+   * ArchiWiki's custom underline syntax is:
+   *
+   * ++underlined text++
+   *
+   * We temporarily replace it with placeholders BEFORE Markdown parsing.
+   *
+   * This is important because replacing it after parsing would also modify
+   * examples contained inside fenced code blocks.
+   */
+  const renderedContent = useMemo(() => {
+    if (!content.trim()) return "";
+
+    const underlineTokens = [];
+
+    const markdownWithTokens = content.replace(
+      /\+\+([^+\n]+)\+\+/g,
+      (_, text) => {
+        const token = `ARCHIWIKI_UNDERLINE_TOKEN_${underlineTokens.length}_END`;
+        underlineTokens.push(text);
+        return token;
+      }
+    );
+
+    let html = marked.parse(markdownWithTokens, {
+      gfm: true,
+      breaks: false,
+    });
+
+    underlineTokens.forEach((text, index) => {
+      const token = `ARCHIWIKI_UNDERLINE_TOKEN_${index}_END`;
+      html = html.replace(
+        new RegExp(token, "g"),
+        `<u class="archiwiki-underline">${text}</u>`
+      );
+    });
+
+    return html;
+  }, [content]);
+
   return (
-    <div className={`min-h-screen ${pageClass}`}>
+    <div
+      className={`h-full min-h-0 overflow-y-auto ${pageClass}`}
+    >
+      <style>{`
+        .archiwiki-guide {
+          font-family: Montserrat, system-ui, sans-serif;
+          font-size: 0.95rem;
+          line-height: 1.75;
+        }
+
+        /* ---------------------------------------------
+           HEADINGS
+           --------------------------------------------- */
+
+        .archiwiki-guide h1,
+        .archiwiki-guide h2,
+        .archiwiki-guide h3,
+        .archiwiki-guide h4,
+        .archiwiki-guide h5,
+        .archiwiki-guide h6 {
+          font-family: Montserrat, system-ui, sans-serif;
+          font-weight: 700;
+          line-height: 1.3;
+          letter-spacing: -0.01em;
+        }
+
+        .archiwiki-guide h1 {
+          font-size: 1.8rem;
+          margin-top: 0;
+          margin-bottom: 1.25rem;
+        }
+
+        .archiwiki-guide h2 {
+          font-size: 1.5rem;
+          margin-top: 2.25rem;
+          margin-bottom: 0.9rem;
+        }
+
+        .archiwiki-guide h3 {
+          font-size: 1.25rem;
+          margin-top: 1.8rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .archiwiki-guide h4 {
+          font-size: 1.1rem;
+          margin-top: 1.5rem;
+          margin-bottom: 0.65rem;
+        }
+
+        .archiwiki-guide h5,
+        .archiwiki-guide h6 {
+          font-size: 1rem;
+          margin-top: 1.35rem;
+          margin-bottom: 0.6rem;
+        }
+
+        /* ---------------------------------------------
+           PARAGRAPHS
+           --------------------------------------------- */
+
+        .archiwiki-guide p {
+          margin: 0 0 1.15rem;
+        }
+
+        .archiwiki-guide p:last-child {
+          margin-bottom: 0;
+        }
+
+        /* ---------------------------------------------
+           BOLD / ITALIC
+           --------------------------------------------- */
+
+        .archiwiki-guide strong {
+          font-weight: 700;
+        }
+
+        .archiwiki-guide em {
+          font-style: italic;
+        }
+
+        /* ---------------------------------------------
+           CUSTOM UNDERLINE
+           ++text++
+           --------------------------------------------- */
+
+        .archiwiki-guide .archiwiki-underline {
+          text-decoration-line: underline;
+          text-decoration-thickness: 1px;
+          text-underline-offset: 2px;
+        }
+
+        /* ---------------------------------------------
+           LINKS
+           --------------------------------------------- */
+
+        .archiwiki-guide a {
+          color: ${dark ? "#93c5fd" : "#2E8B57"};
+          text-decoration: underline;
+          text-decoration-thickness: 1px;
+          text-underline-offset: 2px;
+          cursor: pointer;
+        }
+
+        .archiwiki-guide a:hover {
+          color: ${dark ? "#bfdbfe" : "#246B45"};
+        }
+
+        /* ---------------------------------------------
+           LISTS
+           --------------------------------------------- */
+
+        .archiwiki-guide ul,
+        .archiwiki-guide ol {
+          margin-top: 0;
+          margin-bottom: 1.15rem;
+          padding-left: 1.75rem;
+        }
+
+        .archiwiki-guide ul {
+          list-style-type: disc;
+        }
+
+        .archiwiki-guide ol {
+          list-style-type: decimal;
+        }
+
+        .archiwiki-guide li {
+          margin: 0.3rem 0;
+          padding-left: 0.15rem;
+        }
+
+        .archiwiki-guide li > ul,
+        .archiwiki-guide li > ol {
+          margin-top: 0.3rem;
+          margin-bottom: 0.3rem;
+        }
+
+        /* ---------------------------------------------
+           BLOCKQUOTES
+           --------------------------------------------- */
+
+        .archiwiki-guide blockquote {
+          margin: 1.25rem 0;
+          padding: 0.5rem 1rem;
+          border-left: 4px solid ${dark ? "#525252" : "#a3a3a3"};
+          color: ${dark ? "#a3a3a3" : "#737373"};
+          font-style: italic;
+        }
+
+        .archiwiki-guide blockquote p {
+          margin-bottom: 0;
+        }
+
+        /* ---------------------------------------------
+           INLINE CODE
+           --------------------------------------------- */
+
+        .archiwiki-guide code {
+          font-family:
+            ui-monospace,
+            SFMono-Regular,
+            Menlo,
+            Monaco,
+            Consolas,
+            "Liberation Mono",
+            monospace;
+
+          font-size: 0.9em;
+          padding: 0.12rem 0.35rem;
+          border-radius: 0.4rem;
+
+          background: ${dark
+            ? "rgba(255, 255, 255, 0.10)"
+            : "rgba(0, 0, 0, 0.06)"};
+
+          color: inherit;
+        }
+
+        /* ---------------------------------------------
+           FENCED CODE BLOCKS
+           --------------------------------------------- */
+
+        .archiwiki-guide pre {
+          margin: 1.25rem 0;
+          padding: 1rem;
+          overflow-x: auto;
+          border-radius: 0.5rem;
+
+          background: ${dark
+            ? "rgba(255, 255, 255, 0.08)"
+            : "rgba(0, 0, 0, 0.055)"};
+
+          border: 1px solid ${dark ? "#3f3f46" : "#e5e5e5"};
+
+          line-height: 1.55;
+        }
+
+        .archiwiki-guide pre code {
+          display: block;
+          padding: 0;
+          background: transparent;
+          border-radius: 0;
+          font-size: 0.86rem;
+          white-space: pre;
+        }
+
+        /* ---------------------------------------------
+           HORIZONTAL RULES
+           --------------------------------------------- */
+
+        .archiwiki-guide hr {
+          display: block;
+          width: 100%;
+          height: 1px;
+          margin: 2rem 0;
+
+          border: 0;
+          border-top: 1px solid
+            ${dark ? "#525252" : "#d4d4d4"};
+        }
+
+        /* ---------------------------------------------
+           TABLES
+           --------------------------------------------- */
+
+        .archiwiki-guide table {
+          width: 100%;
+          margin: 1.25rem 0;
+          border-collapse: collapse;
+          display: block;
+          overflow-x: auto;
+        }
+
+        .archiwiki-guide th,
+        .archiwiki-guide td {
+          padding: 0.5rem 0.75rem;
+          border: 1px solid
+            ${dark ? "#525252" : "#d4d4d4"};
+          text-align: left;
+          vertical-align: top;
+        }
+
+        .archiwiki-guide th {
+          font-weight: 700;
+          background: ${dark
+            ? "rgba(255, 255, 255, 0.06)"
+            : "rgba(0, 0, 0, 0.04)"};
+        }
+
+        /* ---------------------------------------------
+           IMAGES
+           --------------------------------------------- */
+
+        .archiwiki-guide img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          margin: 1.25rem 0;
+        }
+
+        /* ---------------------------------------------
+           MOBILE
+           --------------------------------------------- */
+
+        @media (max-width: 639px) {
+          .archiwiki-guide {
+            font-size: 0.92rem;
+          }
+
+          .archiwiki-guide h1 {
+            font-size: 1.55rem;
+          }
+
+          .archiwiki-guide h2 {
+            font-size: 1.35rem;
+          }
+
+          .archiwiki-guide h3 {
+            font-size: 1.15rem;
+          }
+
+          .archiwiki-guide pre {
+            max-width: 100%;
+            padding: 0.8rem;
+          }
+
+          .archiwiki-guide table {
+            max-width: 100%;
+          }
+        }
+      `}</style>
+
       <div className="max-w-4xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
         <div className="flex items-center justify-between gap-4">
           <button
@@ -90,7 +422,10 @@ export default function Guide({ theme = "beige" }) {
 
         <div className="mt-10 flex items-center gap-3">
           <BookOpen size={22} strokeWidth={1.5} />
-          <h1 className="text-2xl font-medium tracking-wide">Guide</h1>
+
+          <h1 className="text-2xl font-medium tracking-wide">
+            Guide
+          </h1>
         </div>
 
         <p className={`mt-2 text-sm ${mutedClass}`}>
@@ -98,27 +433,33 @@ export default function Guide({ theme = "beige" }) {
         </p>
 
         <article
-          className={`mt-8 rounded border p-5 sm:p-8 overflow-x-auto ${
+          className={`mt-8 rounded border ${
             cardClass
           }`}
         >
           {loading ? (
-            <p className={`text-sm ${mutedClass}`}>Loading Guide…</p>
+            <div className="p-5 sm:p-8">
+              <p className={`text-sm ${mutedClass}`}>
+                Loading Guide…
+              </p>
+            </div>
           ) : error ? (
-            <p className="text-sm text-red-600">{error}</p>
+            <div className="p-5 sm:p-8">
+              <p className="text-sm text-red-600">
+                {error}
+              </p>
+            </div>
           ) : content.trim() ? (
             <div
-              className="prose prose-sm max-w-none
-                prose-headings:font-semibold
-                prose-p:leading-7
-                prose-li:leading-7
-                prose-pre:overflow-x-auto"
+              className="archiwiki-guide p-5 sm:p-8"
               dangerouslySetInnerHTML={{
-                __html: marked.parse(content)
+                __html: renderedContent,
               }}
             />
           ) : (
-            <div className={`text-sm leading-7 ${mutedClass}`}>
+            <div
+              className={`p-5 sm:p-8 text-sm leading-7 ${mutedClass}`}
+            >
               The Guide has not been published yet.
             </div>
           )}

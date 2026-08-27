@@ -142,6 +142,17 @@ const [forcePwaSaving, setForcePwaSaving] =
   const [deleteUid, setDeleteUid] = useState("");
   const [deleteSaving, setDeleteSaving] = useState(false);
 
+  const [clearClosedIssuesSaving, setClearClosedIssuesSaving] = useState(false);
+const [clearAcceptedFeedbackSaving, setClearAcceptedFeedbackSaving] = useState(false);
+
+  const [userDataStats, setUserDataStats] = useState({
+  uid: "",
+  files: 0,
+  folders: 0
+});
+const [userDataStatsOpen, setUserDataStatsOpen] = useState(false);
+const [userDataStatsLoading, setUserDataStatsLoading] = useState(false);
+
   const notificationIconComponents = { Bell, Megaphone, Info, AlertTriangle, AlertCircle };
   const notificationRef = doc(db, "adminMetrics", "notification");
   const pwaGateRef = doc(
@@ -720,6 +731,165 @@ setMessage(`Comment added to ${feedback.feedbackId || feedback.id}.`);
       setFeedbackSaving((current) => ({ ...current, [key]: false }));
     }
   };
+
+  const checkUserData = async () => {
+  const uid = deleteUid.trim();
+
+  if (!authorized || !uid || userDataStatsLoading) {
+    return;
+  }
+
+  setUserDataStatsLoading(true);
+  setError("");
+
+  try {
+    const [notesSnapshot, foldersSnapshot] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, "notes"),
+          where("userId", "==", uid)
+        )
+      ),
+      getDocs(
+        query(
+          collection(db, "folders"),
+          where("userId", "==", uid)
+        )
+      )
+    ]);
+
+    setUserDataStats({
+      uid,
+      files: notesSnapshot.size,
+      folders: foldersSnapshot.size
+    });
+
+    setUserDataStatsOpen(true);
+  } catch (err) {
+    console.error("Failed to check user data:", err);
+
+    setError(
+      err?.message ||
+        "Unable to check user data. Check Firestore rules."
+    );
+  } finally {
+    setUserDataStatsLoading(false);
+  }
+};
+
+const clearClosedIssues = async () => {
+  if (!authorized || clearClosedIssuesSaving) return;
+
+  const confirmed = window.confirm(
+    "Clear all closed issue tickets?\n\nThis will permanently delete every issue with status \"closed\". This action cannot be undone."
+  );
+
+  if (!confirmed) return;
+
+  setClearClosedIssuesSaving(true);
+  setError("");
+  setMessage("");
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "issues"),
+        where("status", "==", "closed")
+      )
+    );
+
+    if (snapshot.empty) {
+      setMessage("There are no closed issue tickets to clear.");
+      return;
+    }
+
+    const batch = writeBatch(db);
+
+    snapshot.docs.forEach((issue) => {
+      batch.delete(issue.ref);
+    });
+
+    await batch.commit();
+
+    setIssues((current) =>
+      current.filter(
+        (issue) => (issue.status || "open") !== "closed"
+      )
+    );
+
+    setMessage(
+      `${snapshot.size} closed issue ticket${
+        snapshot.size === 1 ? "" : "s"
+      } deleted.`
+    );
+  } catch (err) {
+    console.error("Failed to clear closed issues:", err);
+
+    setError(
+      err?.message ||
+        "Unable to clear closed issue tickets. Check Firestore rules."
+    );
+  } finally {
+    setClearClosedIssuesSaving(false);
+  }
+};
+
+const clearAcceptedFeedback = async () => {
+  if (!authorized || clearAcceptedFeedbackSaving) return;
+
+  const confirmed = window.confirm(
+    "Clear all accepted feedback?\n\nThis will permanently delete every feedback item with status \"accepted\". This action cannot be undone."
+  );
+
+  if (!confirmed) return;
+
+  setClearAcceptedFeedbackSaving(true);
+  setError("");
+  setMessage("");
+
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, "feedback"),
+        where("status", "==", "accepted")
+      )
+    );
+
+    if (snapshot.empty) {
+      setMessage("There is no accepted feedback to clear.");
+      return;
+    }
+
+    const batch = writeBatch(db);
+
+    snapshot.docs.forEach((feedback) => {
+      batch.delete(feedback.ref);
+    });
+
+    await batch.commit();
+
+    setFeedbackItems((current) =>
+      current.filter(
+        (item) => (item.status || "submitted") !== "accepted"
+      )
+    );
+
+    setMessage(
+      `${snapshot.size} accepted feedback item${
+        snapshot.size === 1 ? "" : "s"
+      } deleted.`
+    );
+  } catch (err) {
+    console.error("Failed to clear accepted feedback:", err);
+
+    setError(
+      err?.message ||
+        "Unable to clear accepted feedback. Check Firestore rules."
+    );
+  } finally {
+    setClearAcceptedFeedbackSaving(false);
+  }
+};
 
   const deleteUserData = async () => {
     const uid = deleteUid.trim();
@@ -1693,11 +1863,11 @@ const shareInviteLink = async (token) => {
               ["stats", "Stats"],
               ["notification", "Notification"],
               ["invitations", "Invitations"],
-              ["accounts", "Accounts"],
               ["help", "Help"],
               ["components", "Components"],
               ["issues", "Issues"],
-              ["feedback", "Feedback"]
+              ["feedback", "Feedback"],
+              ["accounts", "Data"]
             ].map(([id, label]) => (
               <button key={id} type="button" onClick={() => setActiveTab(id)} className={`shrink-0 px-4 py-2.5 text-sm border-b-2 ${activeTab === id ? "border-neutral-900 text-neutral-900 font-semibold" : "border-transparent text-neutral-500 hover:text-neutral-900"}`}>
                 {label}
@@ -1796,6 +1966,14 @@ const shareInviteLink = async (token) => {
                 className="flex-1 min-w-0 border border-neutral-300 rounded px-3 py-2 text-sm font-mono"
               />
               <button
+  type="button"
+  onClick={checkUserData}
+  disabled={!deleteUid.trim() || userDataStatsLoading}
+  className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-neutral-300 rounded text-sm hover:bg-neutral-50 disabled:opacity-50"
+>
+  {userDataStatsLoading ? "Checking…" : "Check user data"}
+</button>
+              <button
                 type="button"
                 onClick={deleteUserData}
                 disabled={!deleteUid.trim() || deleteSaving}
@@ -1813,8 +1991,92 @@ const shareInviteLink = async (token) => {
                 collections.
               </p>
             </div>
+
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+  <button
+    type="button"
+    onClick={clearClosedIssues}
+    disabled={clearClosedIssuesSaving}
+    className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded text-sm hover:bg-red-50 disabled:opacity-50"
+  >
+    <Trash2 size={15} />
+    {clearClosedIssuesSaving
+      ? "Clearing…"
+      : "Clear closed tickets"}
+  </button>
+
+  <button
+    type="button"
+    onClick={clearAcceptedFeedback}
+    disabled={clearAcceptedFeedbackSaving}
+    className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-red-300 text-red-700 rounded text-sm hover:bg-red-50 disabled:opacity-50"
+  >
+    <Trash2 size={15} />
+    {clearAcceptedFeedbackSaving
+      ? "Clearing…"
+      : "Clear accepted feedback"}
+  </button>
+</div>
           </div>
         )}
+
+        {userDataStatsOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="w-full max-w-sm bg-white border border-neutral-300 rounded-lg shadow-xl">
+      <div className="p-5 border-b border-neutral-200">
+        <h2 className="font-semibold">
+          User data
+        </h2>
+
+        <p className="mt-1 text-xs text-neutral-500">
+          Files and folders owned by this UID.
+        </p>
+      </div>
+
+      <div className="p-5">
+        <p className="text-xs text-neutral-500">
+          UID
+        </p>
+
+        <p className="mt-1 text-xs font-mono break-all">
+          {userDataStats.uid}
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 mt-5">
+          <div className="border border-neutral-200 rounded p-4">
+            <p className="text-xs text-neutral-500">
+              Files
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold">
+              {userDataStats.files}
+            </p>
+          </div>
+
+          <div className="border border-neutral-200 rounded p-4">
+            <p className="text-xs text-neutral-500">
+              Folders
+            </p>
+
+            <p className="mt-2 text-2xl font-semibold">
+              {userDataStats.folders}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end p-5 border-t border-neutral-200">
+        <button
+          type="button"
+          onClick={() => setUserDataStatsOpen(false)}
+          className="px-4 py-2 border border-neutral-300 rounded text-sm hover:bg-neutral-50"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
         {activeTab === "help" && (
           <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
