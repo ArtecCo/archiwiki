@@ -1158,6 +1158,7 @@ const backgroundY =
   codeWidth +
   leftPadding +
   rightPadding;
+    }
 
     /*
      * -------------------------------------------------------
