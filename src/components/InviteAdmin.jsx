@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { Bell, Megaphone, Info, AlertTriangle, AlertCircle } from "lucide-react";
+import {
+  Bell,
+  Megaphone,
+  Info,
+  AlertTriangle,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Save,
+  RefreshCw
+} from "lucide-react";
 
 import {
   signInWithEmailAndPassword,
@@ -16,7 +26,11 @@ import {
   serverTimestamp,
   doc,
   getDoc,
-  updateDoc
+  updateDoc,
+  getDocs,
+  deleteDoc,
+  where,
+  writeBatch
 } from "firebase/firestore";
 
 import { auth, db } from "../firebase";
@@ -79,11 +93,423 @@ const [newInviteToken, setNewInviteToken] = useState("");
   const [notificationPriority, setNotificationPriority] = useState("low");
   const [notificationIcon, setNotificationIcon] = useState("Bell");
   const [notificationSaving, setNotificationSaving] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("stats");
+  const [stats, setStats] = useState({ notes: 0, folders: 0 });
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState("");
+
+  const [helpContent, setHelpContent] = useState("");
+  const [helpContentSaving, setHelpContentSaving] = useState(false);
+
+  const [components, setComponents] = useState([]);
+  const [newComponent, setNewComponent] = useState("");
+  const [componentsLoading, setComponentsLoading] = useState(false);
+
+  const [issues, setIssues] = useState([]);
+  const [feedbackItems, setFeedbackItems] = useState([]);
+  const [feedbackStatusFilter, setFeedbackStatusFilter] = useState("all");
+  const [feedbackCommentDrafts, setFeedbackCommentDrafts] = useState({});
+  const [feedbackSaving, setFeedbackSaving] = useState({});
+  const [issueStatusFilter, setIssueStatusFilter] = useState("all");
+  const [issueCommentDrafts, setIssueCommentDrafts] = useState({});
+  const [issueSaving, setIssueSaving] = useState({});
+
+  const [deleteUid, setDeleteUid] = useState("");
+  const [deleteSaving, setDeleteSaving] = useState(false);
+
   const notificationIconComponents = { Bell, Megaphone, Info, AlertTriangle, AlertCircle };
   const notificationRef = doc(db, "adminMetrics", "notification");
 
   const maintenanceRef = doc(db, "adminMetrics", "maintenance");
+  const helpContentRef = doc(db, "adminContent", "help");
 
+  const loadStats = async () => {
+    if (!authorized) return;
+    setStatsLoading(true);
+    setStatsError("");
+    try {
+      const [notesSnapshot, foldersSnapshot] = await Promise.all([
+        getDocs(collection(db, "notes")),
+        getDocs(collection(db, "folders"))
+      ]);
+      setStats({ notes: notesSnapshot.size, folders: foldersSnapshot.size });
+    } catch (err) {
+      console.error("Failed to load database statistics:", err);
+      setStatsError(err?.message || "Unable to load database statistics. Check Firestore rules.");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authorized || activeTab !== "stats") return;
+    loadStats();
+  }, [authorized, activeTab]);
+
+  useEffect(() => {
+    if (!authorized) return;
+
+    if (activeTab === "help") loadHelpContent();
+    if (activeTab === "components") loadComponents();
+    if (activeTab === "issues") loadIssues();
+    if (activeTab === "feedback") loadFeedback();
+  }, [authorized, activeTab]);
+
+
+  const loadHelpContent = async () => {
+    if (!authorized) return;
+
+    try {
+      const snapshot = await getDoc(helpContentRef);
+      setHelpContent(
+        snapshot.exists() && typeof snapshot.data()?.content === "string"
+          ? snapshot.data().content
+          : ""
+      );
+    } catch (err) {
+      console.error("Failed to load help content:", err);
+      setError(err?.message || "Unable to load help content.");
+    }
+  };
+
+  const saveHelpContent = async () => {
+    if (!authorized || helpContentSaving) return;
+
+    setHelpContentSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      await setDoc(
+        helpContentRef,
+        {
+          content: helpContent,
+          updatedAt: serverTimestamp(),
+          updatedBy: user.uid
+        },
+        { merge: true }
+      );
+      setMessage("Help content saved.");
+    } catch (err) {
+      console.error("Failed to save help content:", err);
+      setError(err?.message || "Unable to save help content.");
+    } finally {
+      setHelpContentSaving(false);
+    }
+  };
+
+  const loadComponents = async () => {
+    if (!authorized) return;
+
+    setComponentsLoading(true);
+    try {
+      const snapshot = await getDocs(collection(db, "helpComponents"));
+      setComponents(
+        snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .sort((a, b) =>
+            String(a.name || "").localeCompare(String(b.name || ""))
+          )
+      );
+    } catch (err) {
+      console.error("Failed to load help components:", err);
+      setError(err?.message || "Unable to load help components.");
+    } finally {
+      setComponentsLoading(false);
+    }
+  };
+
+  const addComponent = async () => {
+    const name = newComponent.trim();
+    if (!authorized || !name) return;
+
+    if (
+      components.some(
+        (item) => String(item.name || "").toLowerCase() === name.toLowerCase()
+      )
+    ) {
+      setError("That component already exists.");
+      return;
+    }
+
+    try {
+      const baseId =
+        name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) ||
+        `component-${Date.now()}`;
+      const id = components.some((item) => item.id === baseId)
+        ? `${baseId}-${Date.now()}`
+        : baseId;
+
+      await setDoc(doc(db, "helpComponents", id), {
+        name,
+        active: true,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+
+      setNewComponent("");
+      await loadComponents();
+      setMessage(`Component "${name}" added.`);
+      setError("");
+    } catch (err) {
+      console.error("Failed to add component:", err);
+      setError(err?.message || "Unable to add component.");
+    }
+  };
+
+  const toggleComponent = async (component) => {
+    try {
+      await updateDoc(doc(db, "helpComponents", component.id), {
+        active: component.active !== true,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      });
+      await loadComponents();
+    } catch (err) {
+      console.error("Failed to update component:", err);
+      setError(err?.message || "Unable to update component.");
+    }
+  };
+
+  const removeComponent = async (component) => {
+    if (
+      !window.confirm(
+        `Delete component "${component.name}"?\n\nExisting tickets using this component will not be deleted.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "helpComponents", component.id));
+      await loadComponents();
+      setMessage(`Component "${component.name}" deleted.`);
+      setError("");
+    } catch (err) {
+      console.error("Failed to delete component:", err);
+      setError(err?.message || "Unable to delete component.");
+    }
+  };
+
+  const loadIssues = async () => {
+    if (!authorized) return;
+
+    try {
+      const snapshot = await getDocs(collection(db, "issues"));
+      setIssues(
+        snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() || Number(a.createdAt) || 0;
+            const bTime = b.createdAt?.toMillis?.() || Number(b.createdAt) || 0;
+            return bTime - aTime;
+          })
+      );
+    } catch (err) {
+      console.error("Failed to load issues:", err);
+      setError(err?.message || "Unable to load issues.");
+    }
+  };
+
+  const updateIssueStatus = async (issue, status) => {
+    const key = `${issue.id}:status`;
+    setIssueSaving((current) => ({ ...current, [key]: true }));
+
+    try {
+      await updateDoc(doc(db, "issues", issue.id), {
+        status,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      });
+      await loadIssues();
+      setMessage(`Issue ${issue.issueId || issue.id} updated.`);
+      setError("");
+    } catch (err) {
+      console.error("Failed to update issue status:", err);
+      setError(err?.message || "Unable to update issue status.");
+    } finally {
+      setIssueSaving((current) => ({ ...current, [key]: false }));
+    }
+  };
+
+  const addIssueComment = async (issue) => {
+    const comment = String(issueCommentDrafts[issue.id] || "").trim();
+    if (!comment) return;
+
+    const key = `${issue.id}:comment`;
+    setIssueSaving((current) => ({ ...current, [key]: true }));
+
+    try {
+      const commentId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+      await setDoc(doc(db, "issues", issue.id, "comments", commentId), {
+        text: comment,
+        authorUid: user.uid,
+        authorEmail: user.email || "",
+        authorType: "admin",
+        createdAt: serverTimestamp()
+      });
+
+      await updateDoc(doc(db, "issues", issue.id), {
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      });
+
+      setIssueCommentDrafts((current) => ({
+        ...current,
+        [issue.id]: ""
+      }));
+      await loadIssues();
+      setMessage(`Comment added to ${issue.issueId || issue.id}.`);
+      setError("");
+    } catch (err) {
+      console.error("Failed to add issue comment:", err);
+      setError(err?.message || "Unable to add issue comment.");
+    } finally {
+      setIssueSaving((current) => ({ ...current, [key]: false }));
+    }
+  };
+
+  const loadFeedback = async () => {
+    if (!authorized) return;
+
+    try {
+      const snapshot = await getDocs(collection(db, "feedback"));
+
+      const items = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .sort((a, b) => {
+          const aTime = a.createdAt?.toMillis?.() || 0;
+          const bTime = b.createdAt?.toMillis?.() || 0;
+          return bTime - aTime;
+        });
+
+      setFeedbackItems(items);
+    } catch (err) {
+      console.error("Failed to load feedback:", err);
+      setError(err?.message || "Unable to load feedback.");
+    }
+  };
+
+  const updateFeedbackStatus = async (feedback, status) => {
+    const key = `${feedback.id}:status`;
+    setFeedbackSaving((current) => ({ ...current, [key]: true }));
+
+    try {
+      await updateDoc(doc(db, "feedback", feedback.id), {
+        status,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      });
+
+      await loadFeedback();
+      setMessage(`Feedback ${feedback.feedbackId || feedback.id} updated.`);
+      setError("");
+    } catch (err) {
+      console.error("Failed to update feedback status:", err);
+      setError(err?.message || "Unable to update feedback status.");
+    } finally {
+      setFeedbackSaving((current) => ({ ...current, [key]: false }));
+    }
+  };
+
+  const addFeedbackComment = async (feedback) => {
+    const comment = String(
+      feedbackCommentDrafts[feedback.id] || ""
+    ).trim();
+
+    if (!comment) return;
+
+    const key = `${feedback.id}:comment`;
+    setFeedbackSaving((current) => ({ ...current, [key]: true }));
+
+    try {
+      const commentId = `${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
+
+      await setDoc(
+        doc(db, "feedback", feedback.id, "comments", commentId),
+        {
+          text: comment,
+          authorUid: user.uid,
+          authorEmail: user.email || "",
+          authorType: "admin",
+          createdAt: serverTimestamp()
+        }
+      );
+
+      await updateDoc(doc(db, "feedback", feedback.id), {
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      });
+
+      setFeedbackCommentDrafts((current) => ({
+        ...current,
+        [feedback.id]: ""
+      }));
+
+      setMessage(`Comment added to ${feedback.feedbackId || feedback.id}.`);
+      setError("");
+    } catch (err) {
+      console.error("Failed to add feedback comment:", err);
+      setError(err?.message || "Unable to add feedback comment.");
+    } finally {
+      setFeedbackSaving((current) => ({ ...current, [key]: false }));
+    }
+  };
+
+  const deleteUserData = async () => {
+    const uid = deleteUid.trim();
+    if (!authorized || !uid || deleteSaving) return;
+
+    if (
+      !window.confirm(
+        `DELETE ALL DATA FOR USER?\n\nUID: ${uid}\n\nThis will permanently delete every note and folder whose userId matches this UID. The Firebase Authentication account will NOT be deleted.\n\nThis cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setDeleteSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const [notesSnapshot, foldersSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "notes"), where("userId", "==", uid))),
+        getDocs(query(collection(db, "folders"), where("userId", "==", uid)))
+      ]);
+
+      const references = [
+        ...notesSnapshot.docs.map((item) => item.ref),
+        ...foldersSnapshot.docs.map((item) => item.ref)
+      ];
+
+      for (let index = 0; index < references.length; index += 450) {
+        const batch = writeBatch(db);
+        references.slice(index, index + 450).forEach((reference) => {
+          batch.delete(reference);
+        });
+        await batch.commit();
+      }
+
+      setMessage(
+        `Deleted ${notesSnapshot.size} note(s) and ${foldersSnapshot.size} folder(s) for UID ${uid}.`
+      );
+      setDeleteUid("");
+      if (activeTab === "stats") await loadStats();
+    } catch (err) {
+      console.error("Failed to delete user data:", err);
+      setError(
+        err?.message ||
+          "Unable to delete user data. Check Firestore rules and indexes."
+      );
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
 
   /*
    * Firebase Auth listener.
@@ -947,7 +1373,7 @@ const shareInviteLink = async (token) => {
    * ADMIN DASHBOARD
    */
   return (
-    <div className="min-h-screen bg-[#F5F2EB] text-neutral-900 p-6">
+    <div className="min-h-[100dvh] overflow-y-auto bg-[#F5F2EB] text-neutral-900 p-6">
 
       <div className="max-w-5xl mx-auto">
 
@@ -987,7 +1413,456 @@ const shareInviteLink = async (token) => {
 
         </div>
 
+        <div className="mb-6 border-b border-neutral-300">
+          <div className="flex gap-1 overflow-x-auto">
+            {[
+              ["stats", "Stats"],
+              ["notification", "Notification"],
+              ["invitations", "Invitations"],
+              ["accounts", "Accounts"],
+              ["help", "Help"],
+              ["components", "Components"],
+              ["issues", "Issues"],
+              ["feedback", "Feedback"]
+            ].map(([id, label]) => (
+              <button key={id} type="button" onClick={() => setActiveTab(id)} className={`shrink-0 px-4 py-2.5 text-sm border-b-2 ${activeTab === id ? "border-neutral-900 text-neutral-900 font-semibold" : "border-transparent text-neutral-500 hover:text-neutral-900"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
+        {activeTab === "stats" && (
+          <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="font-semibold">Database statistics</h2>
+                <p className="text-xs text-neutral-500 mt-1">Current totals across all notes and folders.</p>
+              </div>
+              <button type="button" onClick={loadStats} disabled={statsLoading} className="px-3 py-2 border border-neutral-300 rounded text-xs hover:bg-neutral-50 disabled:opacity-50">
+                {statsLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+            {statsError && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded"><p className="text-xs text-red-700">{statsError}</p></div>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="border border-neutral-200 rounded p-5"><p className="text-xs text-neutral-500">Notes</p><p className="mt-2 text-3xl font-semibold">{statsLoading ? "…" : stats.notes}</p></div>
+              <div className="border border-neutral-200 rounded p-5"><p className="text-xs text-neutral-500">Folders</p><p className="mt-2 text-3xl font-semibold">{statsLoading ? "…" : stats.folders}</p></div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "accounts" && (
+          <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+            <h2 className="font-semibold">Account data management</h2>
+
+            <p className="text-xs text-neutral-500 mt-2 max-w-2xl">
+              Enter a Firebase Authentication UID to permanently delete all
+              Firestore notes and folders belonging to that user. The
+              Authentication account itself is not deleted.
+            </p>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-2 max-w-2xl">
+              <input
+                value={deleteUid}
+                onChange={(e) => setDeleteUid(e.target.value)}
+                placeholder="Firebase user UID"
+                className="flex-1 min-w-0 border border-neutral-300 rounded px-3 py-2 text-sm font-mono"
+              />
+              <button
+                type="button"
+                onClick={deleteUserData}
+                disabled={!deleteUid.trim() || deleteSaving}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-700 text-white rounded text-sm disabled:opacity-50"
+              >
+                <Trash2 size={15} />
+                {deleteSaving ? "Deleting…" : "Delete user data"}
+              </button>
+            </div>
+
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded max-w-2xl">
+              <p className="text-xs text-red-800">
+                This permanently deletes matching documents from the
+                <strong> notes </strong>and<strong> folders </strong>
+                collections.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "help" && (
+          <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="font-semibold">Help page content</h2>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Editable Markdown/Help content for the future user Help page.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={saveHelpContent}
+                disabled={helpContentSaving}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
+              >
+                <Save size={14} />
+                {helpContentSaving ? "Saving…" : "Save help content"}
+              </button>
+            </div>
+
+            <textarea
+              value={helpContent}
+              onChange={(e) => setHelpContent(e.target.value)}
+              placeholder="Write the Help page content here…"
+              className="w-full min-h-[420px] box-border border border-neutral-300 rounded px-3 py-3 text-sm font-mono leading-6 resize-y"
+            />
+          </div>
+        )}
+
+        {activeTab === "components" && (
+          <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="font-semibold">Help components</h2>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Components users can select when submitting an issue or feature request.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadComponents}
+                disabled={componentsLoading}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-300 rounded text-xs hover:bg-neutral-50 disabled:opacity-50"
+              >
+                <RefreshCw size={13} />
+                {componentsLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 mb-5">
+              <input
+                value={newComponent}
+                onChange={(e) => setNewComponent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addComponent();
+                }}
+                placeholder="e.g. Viewer, Editor, Graph"
+                className="flex-1 min-w-0 border border-neutral-300 rounded px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={addComponent}
+                disabled={!newComponent.trim()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded text-sm disabled:opacity-50"
+              >
+                <Plus size={15} />
+                Add component
+              </button>
+            </div>
+
+            {components.length === 0 ? (
+              <p className="text-sm text-neutral-500">No components configured yet.</p>
+            ) : (
+              <div className="divide-y divide-neutral-100 border border-neutral-200 rounded">
+                {components.map((component) => (
+                  <div key={component.id} className="flex items-center justify-between gap-3 p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{component.name}</p>
+                      <p className="text-[11px] text-neutral-400">
+                        {component.active === false ? "Inactive" : "Active"}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleComponent(component)}
+                        className="px-2.5 py-1.5 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+                      >
+                        {component.active === false ? "Enable" : "Disable"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeComponent(component)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-red-200 text-red-600 rounded text-xs hover:bg-red-50"
+                      >
+                        <Trash2 size={13} />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "issues" && (
+          <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+              <div>
+                <h2 className="font-semibold">Issues & feature requests</h2>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Review tickets, change status and reply to users.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={issueStatusFilter}
+                  onChange={(e) => setIssueStatusFilter(e.target.value)}
+                  className="border border-neutral-300 rounded px-2 py-2 text-xs bg-white"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="open">Open</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="closed">Closed</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={loadIssues}
+                  className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+                >
+                  <RefreshCw size={13} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {issues.filter(
+              (issue) =>
+                issueStatusFilter === "all" ||
+                (issue.status || "open") === issueStatusFilter
+            ).length === 0 ? (
+              <div className="p-8 text-center text-sm text-neutral-500 border border-neutral-200 rounded">
+                No issues match this filter.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {issues
+                  .filter(
+                    (issue) =>
+                      issueStatusFilter === "all" ||
+                      (issue.status || "open") === issueStatusFilter
+                  )
+                  .map((issue) => {
+                    const status = issue.status || "open";
+                    const statusKey = `${issue.id}:status`;
+                    const commentKey = `${issue.id}:comment`;
+
+                    return (
+                      <div key={issue.id} className="border border-neutral-200 rounded p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono text-neutral-500">
+                              {issue.issueId || issue.id}
+                            </p>
+                            <h3 className="mt-1 font-semibold">
+                              {issue.title || "Untitled issue"}
+                            </h3>
+                            <p className="mt-1 text-xs text-neutral-500">
+                              {issue.type === "feature" ? "Feature request" : "Issue"}
+                              {" · "}
+                              {issue.componentName || issue.component || "Unknown component"}
+                            </p>
+                          </div>
+
+                          <select
+                            value={status}
+                            disabled={issueSaving[statusKey]}
+                            onChange={(e) => updateIssueStatus(issue, e.target.value)}
+                            className="shrink-0 border border-neutral-300 rounded px-2 py-2 text-xs bg-white"
+                          >
+                            <option value="open">Open</option>
+                            <option value="in_progress">In progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                          </select>
+                        </div>
+
+                        {issue.description && (
+                          <div className="mt-4 p-3 bg-neutral-50 border border-neutral-200 rounded text-sm whitespace-pre-wrap">
+                            {issue.description}
+                          </div>
+                        )}
+
+                        <p className="mt-3 text-[11px] text-neutral-400">
+                          User UID: {issue.userId || "—"}
+                          {issue.userEmail ? ` · ${issue.userEmail}` : ""}
+                        </p>
+
+                        <div className="mt-4">
+                          <textarea
+                            value={issueCommentDrafts[issue.id] || ""}
+                            onChange={(e) =>
+                              setIssueCommentDrafts((current) => ({
+                                ...current,
+                                [issue.id]: e.target.value
+                              }))
+                            }
+                            placeholder="Write a reply to the user…"
+                            rows={3}
+                            className="w-full border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addIssueComment(issue)}
+                            disabled={
+                              !String(issueCommentDrafts[issue.id] || "").trim() ||
+                              issueSaving[commentKey]
+                            }
+                            className="mt-2 px-3 py-2 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
+                          >
+                            {issueSaving[commentKey] ? "Sending…" : "Add admin comment"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "feedback" && (
+          <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+              <div>
+                <h2 className="font-semibold">User feedback</h2>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Review feedback, accept or decline it, and reply to users.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={feedbackStatusFilter}
+                  onChange={(e) => setFeedbackStatusFilter(e.target.value)}
+                  className="border border-neutral-300 rounded px-2 py-2 text-xs bg-white"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="declined">Declined</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={loadFeedback}
+                  className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+                >
+                  <RefreshCw size={13} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {feedbackItems.filter(
+              (item) =>
+                feedbackStatusFilter === "all" ||
+                (item.status || "submitted") === feedbackStatusFilter
+            ).length === 0 ? (
+              <div className="p-8 text-center text-sm text-neutral-500 border border-neutral-200 rounded">
+                No feedback matches this filter.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {feedbackItems
+                  .filter(
+                    (item) =>
+                      feedbackStatusFilter === "all" ||
+                      (item.status || "submitted") === feedbackStatusFilter
+                  )
+                  .map((item) => {
+                    const status = item.status || "submitted";
+                    const statusKey = `${item.id}:status`;
+                    const commentKey = `${item.id}:comment`;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-neutral-200 rounded p-4"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono text-neutral-500">
+                              {item.feedbackId || item.id}
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold">
+                              {item.componentName || "Unknown component"}
+                            </p>
+
+                            <p className="mt-1 text-xs text-neutral-500">
+                              {item.userEmail || item.userId || "Unknown user"}
+                              {" · "}
+                              {item.createdAt
+                                ? new Date(
+                                    item.createdAt.toMillis
+                                      ? item.createdAt.toMillis()
+                                      : item.createdAt
+                                  ).toLocaleString()
+                                : "—"}
+                            </p>
+                          </div>
+
+                          <select
+                            value={status}
+                            disabled={feedbackSaving[statusKey]}
+                            onChange={(e) =>
+                              updateFeedbackStatus(item, e.target.value)
+                            }
+                            className="shrink-0 border border-neutral-300 rounded px-2 py-2 text-xs bg-white"
+                          >
+                            <option value="submitted">Submitted</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="declined">Declined</option>
+                          </select>
+                        </div>
+
+                        <div className="mt-4 p-3 bg-neutral-50 border border-neutral-200 rounded text-sm whitespace-pre-wrap">
+                          {item.message}
+                        </div>
+
+                        <div className="mt-4">
+                          <textarea
+                            value={feedbackCommentDrafts[item.id] || ""}
+                            onChange={(e) =>
+                              setFeedbackCommentDrafts((current) => ({
+                                ...current,
+                                [item.id]: e.target.value
+                              }))
+                            }
+                            placeholder="Write a reply to the user…"
+                            rows={3}
+                            className="w-full border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => addFeedbackComment(item)}
+                            disabled={
+                              !String(
+                                feedbackCommentDrafts[item.id] || ""
+                              ).trim() ||
+                              feedbackSaving[commentKey]
+                            }
+                            className="mt-2 px-3 py-2 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
+                          >
+                            {feedbackSaving[commentKey]
+                              ? "Sending…"
+                              : "Add admin comment"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "notification" && (
         <div className="bg-white border border-neutral-300 rounded p-4 sm:p-6 mb-6 overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="min-w-0">

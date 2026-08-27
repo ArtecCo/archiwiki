@@ -15,6 +15,9 @@ import {
 } from "firebase/firestore";
 import { encryptData, decryptData } from "./crypto";
 import InviteAdmin from "./components/InviteAdmin";
+import Guide from "./components/Guide";
+import Feedback from "./components/Feedback";
+import Tickets from "./components/Tickets";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import GraphView from "./components/GraphView";
@@ -1409,9 +1412,22 @@ function App() {
   }, [maintenanceChecked]);
 
   if (pathname === "/invite-admin") return <InviteAdmin />;
-  if (!maintenanceChecked) return null;
-  if (maintenance) return <MaintenanceScreen theme={theme} />;
-  return <ArchiWikiApp />;
+
+if (pathname === "/guide") {
+  return <Guide theme={theme} />;
+}
+
+if (pathname === "/feedback") {
+  return <Feedback theme={theme} />;
+}
+
+if (pathname === "/tickets") {
+  return <Tickets theme={theme} />;
+}
+
+if (!maintenanceChecked) return null;
+if (maintenance) return <MaintenanceScreen theme={theme} />;
+return <ArchiWikiApp />;
 }
 
 export default App;

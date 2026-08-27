@@ -1008,43 +1008,139 @@ let renderedHtml = marked.parse(protectedMarkdown, {
       };
 
       const drawWrapped = (
-        lines,
-        x,
-        yy,
-        size,
-        font,
-        style,
-        lineHeight
-      ) => {
+  lines,
+  x,
+  yy,
+  size,
+  font,
+  style,
+  lineHeight
+) => {
+  pdf.setFont(font, style);
+  pdf.setFontSize(size);
+
+  pdf.setTextColor(
+    ...palette.text
+  );
+
+  const drawInline = (line, startX, startY) => {
+    const pattern =
+      /(`[^`\n]+`|\+\+[^+\n]+\+\+)/g;
+
+    let cursor = 0;
+    let currentX = startX;
+    let match;
+
+    while (
+      (match = pattern.exec(line)) !== null
+    ) {
+      const before =
+  plainInline(
+    line.slice(cursor, match.index)
+  );
+
+if (before) {
+  pdf.setFont(font, style);
+
+  pdf.text(
+    before,
+    currentX,
+    startY
+  );
+
+  currentX += pdf.getTextWidth(
+    before
+  );
+}
+
+      const token = match[0];
+
+      if (token.startsWith("`")) {
+        const codeText =
+          token.slice(1, -1);
+
         pdf.setFont(
-          font,
-          style
+          "courier",
+          "normal"
         );
 
-        pdf.setFontSize(size);
-
-        pdf.setTextColor(
-          ...palette.text
+        pdf.text(
+          codeText,
+          currentX,
+          startY
         );
 
-        lines.forEach(
-          (line, index) => {
-            pdf.text(
-              line,
-              x,
-              yy +
-                index *
-                  lineHeight +
-                size * 0.35
-            );
-          }
+        currentX += pdf.getTextWidth(
+          codeText
+        );
+      } else {
+        const underlineText =
+          token.slice(2, -2);
+
+        pdf.setFont(font, style);
+
+        pdf.text(
+          underlineText,
+          currentX,
+          startY
         );
 
-        return (
-          lines.length *
-          lineHeight
+        const textWidth =
+          pdf.getTextWidth(
+            underlineText
+          );
+
+        pdf.setLineWidth(0.2);
+
+        pdf.line(
+          currentX,
+          startY + 0.8,
+          currentX + textWidth,
+          startY + 0.8
         );
-      };
+
+        currentX += textWidth;
+      }
+
+      cursor =
+        match.index + token.length;
+    }
+
+    const remaining =
+  line.slice(cursor);
+
+if (remaining) {
+  const cleanedRemaining =
+    plainInline(remaining);
+
+  if (cleanedRemaining) {
+    pdf.setFont(font, style);
+
+    pdf.text(
+      cleanedRemaining,
+      currentX,
+      startY
+    );
+  }
+}
+
+  lines.forEach(
+    (line, index) => {
+      drawInline(
+        line,
+        x,
+        yy +
+          index * lineHeight +
+          size * 0.35
+      );
+    }
+  );
+
+  return (
+    lines.length *
+    lineHeight
+  );
+};
 
       /*
        * -----------------------------------------------------
@@ -1055,8 +1151,7 @@ let renderedHtml = marked.parse(protectedMarkdown, {
       const addParagraph = (
         value
       ) => {
-        const text =
-          plainInline(value);
+        const text = value;
 
         if (!text) {
           y += 2.5;
@@ -2516,10 +2611,44 @@ let renderedHtml = marked.parse(protectedMarkdown, {
               {writingSince}
             </p>
           )}
+
+                    <div className="mt-8 flex items-center justify-center gap-6 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/guide";
+              }}
+              className="hover:underline"
+            >
+              Guide
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/feedback";
+              }}
+              className="hover:underline"
+            >
+              Feedback
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/tickets";
+              }}
+              className="hover:underline"
+            >
+              Tickets
+            </button>
+          </div>
         </div>
       </div>
     );
   }
+
+  
 /*
  * ---------------------------------------------------------
  * EDITOR
