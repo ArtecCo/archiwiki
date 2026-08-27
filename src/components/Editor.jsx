@@ -1154,10 +1154,10 @@ const backgroundY =
         startY
       );
 
-      currentX += horizontalPadding * 4 + 
-        codeWidth +
-        horizontalPadding * 2;
-    }
+      currentX +=
+  codeWidth +
+  leftPadding +
+  rightPadding;
 
     /*
      * -------------------------------------------------------
