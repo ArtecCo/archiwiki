@@ -323,30 +323,31 @@ export default function Guide({ theme = "beige" }) {
            TABLES
            --------------------------------------------- */
 
-        .archiwiki-guide table {
-          width: 100%;
-          margin: 1.25rem 0;
-          border-collapse: collapse;
-          display: block;
-          overflow-x: auto;
-        }
+        .archiwiki-guide   {
+  width: 100%;
+  max-width: 100%;
+  margin: 1.25rem 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
 
-        .archiwiki-guide th,
-        .archiwiki-guide td {
-          padding: 0.5rem 0.75rem;
-          border: 1px solid
-            ${dark ? "#525252" : "#d4d4d4"};
-          text-align: left;
-          vertical-align: top;
-        }
+.archiwiki-guide th,
+.archiwiki-guide td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid
+    ${dark ? "#525252" : "#d4d4d4"};
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
-        .archiwiki-guide th {
-          font-weight: 700;
-          background: ${dark
-            ? "rgba(255, 255, 255, 0.06)"
-            : "rgba(0, 0, 0, 0.04)"};
-        }
-
+.archiwiki-guide th {
+  font-weight: 700;
+  background: ${dark
+    ? "rgba(255, 255, 255, 0.06)"
+    : "rgba(0, 0, 0, 0.04)"};
+}
         /* ---------------------------------------------
            IMAGES
            --------------------------------------------- */
@@ -384,9 +385,6 @@ export default function Guide({ theme = "beige" }) {
             padding: 0.8rem;
           }
 
-          .archiwiki-guide table {
-            max-width: 100%;
-          }
         }
       `}</style>
 

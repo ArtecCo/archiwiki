@@ -1060,7 +1060,7 @@ if (before) {
     "normal"
   );
 
-  pdf.setFontSize(size);
+  pdf.setFontSize(size*0.78);
 
   const codeWidth =
     pdf.getTextWidth(codeText);
