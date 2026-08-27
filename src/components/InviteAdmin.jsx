@@ -71,6 +71,17 @@ const withTimeout = (promise, timeoutMs = 8000) => {
 
 
 export default function InviteAdmin() {
+
+  const [expandedIssue, setExpandedIssue] = useState(null);
+const [expandedFeedback, setExpandedFeedback] = useState(null);
+
+const [issueComments, setIssueComments] = useState({});
+const [feedbackComments, setFeedbackComments] = useState({});
+
+const [issueCommentsLoading, setIssueCommentsLoading] = useState({});
+const [feedbackCommentsLoading, setFeedbackCommentsLoading] = useState({});
+
+
   const [user, setUser] = useState(null);
   const [authorized, setAuthorized] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
@@ -99,7 +110,16 @@ const [forcePwa, setForcePwa] =
 const [forcePwaSaving, setForcePwaSaving] =
   useState(false);
   const [activeTab, setActiveTab] = useState("stats");
-  const [stats, setStats] = useState({ notes: 0, folders: 0 });
+  const [stats, setStats] = useState({
+  notes: 0,
+  folders: 0,
+  tokensGenerated: 0,
+  activeUsers: 0,
+  openTickets: 0,
+  inProgressTickets: 0,
+  closedTickets: 0,
+  feedbackCount: 0
+});
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState("");
 
@@ -133,6 +153,103 @@ const [forcePwaSaving, setForcePwaSaving] =
   const maintenanceRef = doc(db, "adminMetrics", "maintenance");
   const helpContentRef = doc(db, "adminContent", "help");
 
+  const loadIssueComments = async (issueId) => {
+  setIssueCommentsLoading((current) => ({
+    ...current,
+    [issueId]: true
+  }));
+
+  try {
+    const snapshot = await getDocs(
+      collection(db, "issues", issueId, "comments")
+    );
+
+    const items = snapshot.docs
+      .map((item) => ({
+        id: item.id,
+        ...item.data()
+      }))
+      .sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || 0;
+        const bTime = b.createdAt?.toMillis?.() || 0;
+        return aTime - bTime;
+      });
+
+    setIssueComments((current) => ({
+      ...current,
+      [issueId]: items
+    }));
+  } catch (err) {
+    console.error("Failed to load issue comments:", err);
+    setError(err?.message || "Unable to load issue comments.");
+  } finally {
+    setIssueCommentsLoading((current) => ({
+      ...current,
+      [issueId]: false
+    }));
+  }
+};
+
+const toggleIssue = async (issueId) => {
+  const next = expandedIssue === issueId ? null : issueId;
+  setExpandedIssue(next);
+
+  if (next) {
+    await loadIssueComments(next);
+  }
+};
+
+
+const loadFeedbackComments = async (feedbackId) => {
+  setFeedbackCommentsLoading((current) => ({
+    ...current,
+    [feedbackId]: true
+  }));
+
+  try {
+    const snapshot = await getDocs(
+      collection(db, "feedback", feedbackId, "comments")
+    );
+
+    const items = snapshot.docs
+      .map((item) => ({
+        id: item.id,
+        ...item.data()
+      }))
+      .sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || 0;
+        const bTime = b.createdAt?.toMillis?.() || 0;
+        return aTime - bTime;
+      });
+
+    setFeedbackComments((current) => ({
+      ...current,
+      [feedbackId]: items
+    }));
+  } catch (err) {
+    console.error("Failed to load feedback comments:", err);
+    setError(err?.message || "Unable to load feedback comments.");
+  } finally {
+    setFeedbackCommentsLoading((current) => ({
+      ...current,
+      [feedbackId]: false
+    }));
+  }
+};
+
+const toggleFeedback = async (feedbackId) => {
+  const next =
+    expandedFeedback === feedbackId ? null : feedbackId;
+
+  setExpandedFeedback(next);
+
+  if (next) {
+    await loadFeedbackComments(next);
+  }
+};
+
+
+
   const loadPwaGate = async () => {
   if (!authorized) return;
 
@@ -157,23 +274,80 @@ const [forcePwaSaving, setForcePwaSaving] =
   }
 };
 
-  const loadStats = async () => {
-    if (!authorized) return;
-    setStatsLoading(true);
-    setStatsError("");
-    try {
-      const [notesSnapshot, foldersSnapshot] = await Promise.all([
-        getDocs(collection(db, "notes")),
-        getDocs(collection(db, "folders"))
-      ]);
-      setStats({ notes: notesSnapshot.size, folders: foldersSnapshot.size });
-    } catch (err) {
-      console.error("Failed to load database statistics:", err);
-      setStatsError(err?.message || "Unable to load database statistics. Check Firestore rules.");
-    } finally {
-      setStatsLoading(false);
-    }
-  };
+const loadStats = async () => {
+  if (!authorized) return;
+
+  setStatsLoading(true);
+  setStatsError("");
+
+  try {
+    const [
+      notesSnapshot,
+      foldersSnapshot,
+      invitesSnapshot,
+      issuesSnapshot,
+      feedbackSnapshot
+    ] = await Promise.all([
+      getDocs(collection(db, "notes")),
+      getDocs(collection(db, "folders")),
+      getDocs(collection(db, "pendingInvites")),
+      getDocs(collection(db, "issues")),
+      getDocs(collection(db, "feedback"))
+    ]);
+
+    const issues = issuesSnapshot.docs.map((item) => ({
+      id: item.id,
+      ...item.data()
+    }));
+
+    const activeUserIds = new Set();
+
+    notesSnapshot.docs.forEach((item) => {
+      const data = item.data();
+      if (data.userId) activeUserIds.add(data.userId);
+    });
+
+    foldersSnapshot.docs.forEach((item) => {
+      const data = item.data();
+      if (data.userId) activeUserIds.add(data.userId);
+    });
+
+    issues.forEach((item) => {
+      if (item.userId) activeUserIds.add(item.userId);
+    });
+
+    feedbackSnapshot.docs.forEach((item) => {
+      const data = item.data();
+      if (data.userId) activeUserIds.add(data.userId);
+    });
+
+    setStats({
+      notes: notesSnapshot.size,
+      folders: foldersSnapshot.size,
+      tokensGenerated: invitesSnapshot.size,
+      activeUsers: activeUserIds.size,
+      openTickets: issues.filter(
+        (item) => (item.status || "open") === "open"
+      ).length,
+      inProgressTickets: issues.filter(
+        (item) => item.status === "in_progress"
+      ).length,
+      closedTickets: issues.filter(
+        (item) => item.status === "closed"
+      ).length,
+      feedbackCount: feedbackSnapshot.size
+    });
+  } catch (err) {
+    console.error("Failed to load database statistics:", err);
+
+    setStatsError(
+      err?.message ||
+        "Unable to load database statistics. Check Firestore rules."
+    );
+  } finally {
+    setStatsLoading(false);
+  }
+};
 
   useEffect(() => {
     if (!authorized || activeTab !== "stats") return;
@@ -439,11 +613,14 @@ const [forcePwaSaving, setForcePwaSaving] =
       });
 
       setIssueCommentDrafts((current) => ({
-        ...current,
-        [issue.id]: ""
-      }));
-      await loadIssues();
-      setMessage(`Comment added to ${issue.issueId || issue.id}.`);
+  ...current,
+  [issue.id]: ""
+}));
+
+await loadIssueComments(issue.id);
+await loadIssues();
+
+setMessage(`Comment added to ${issue.issueId || issue.id}.`);
       setError("");
     } catch (err) {
       console.error("Failed to add issue comment:", err);
@@ -528,11 +705,13 @@ const [forcePwaSaving, setForcePwaSaving] =
       });
 
       setFeedbackCommentDrafts((current) => ({
-        ...current,
-        [feedback.id]: ""
-      }));
+  ...current,
+  [feedback.id]: ""
+}));
 
-      setMessage(`Comment added to ${feedback.feedbackId || feedback.id}.`);
+await loadFeedbackComments(feedback.id);
+
+setMessage(`Comment added to ${feedback.feedbackId || feedback.id}.`);
       setError("");
     } catch (err) {
       console.error("Failed to add feedback comment:", err);
@@ -1539,10 +1718,63 @@ const shareInviteLink = async (token) => {
               </button>
             </div>
             {statsError && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded"><p className="text-xs text-red-700">{statsError}</p></div>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="border border-neutral-200 rounded p-5"><p className="text-xs text-neutral-500">Notes</p><p className="mt-2 text-3xl font-semibold">{statsLoading ? "…" : stats.notes}</p></div>
-              <div className="border border-neutral-200 rounded p-5"><p className="text-xs text-neutral-500">Folders</p><p className="mt-2 text-3xl font-semibold">{statsLoading ? "…" : stats.folders}</p></div>
-            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Notes</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.notes}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Folders</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.folders}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Tokens generated</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.tokensGenerated}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Active users</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.activeUsers}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Open tickets</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.openTickets}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Tickets in progress</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.inProgressTickets}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Closed tickets</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.closedTickets}
+    </p>
+  </div>
+
+  <div className="border border-neutral-200 rounded p-4">
+    <p className="text-xs text-neutral-500">Feedback</p>
+    <p className="mt-2 text-2xl font-semibold">
+      {statsLoading ? "…" : stats.feedbackCount}
+    </p>
+  </div>
+</div>
           </div>
         )}
 
@@ -1744,79 +1976,180 @@ const shareInviteLink = async (token) => {
                     const status = issue.status || "open";
                     const statusKey = `${issue.id}:status`;
                     const commentKey = `${issue.id}:comment`;
+                    const isExpanded = expandedIssue === issue.id;
 
                     return (
-                      <div key={issue.id} className="border border-neutral-200 rounded p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-mono text-neutral-500">
-                              {issue.issueId || issue.id}
-                            </p>
-                            <h3 className="mt-1 font-semibold">
-                              {issue.title || "Untitled issue"}
-                            </h3>
-                            <p className="mt-1 text-xs text-neutral-500">
-                              {issue.type === "feature" ? "Feature request" : "Issue"}
-                              {" · "}
-                              {issue.componentName || issue.component || "Unknown component"}
-                            </p>
-                          </div>
+                      <div
+  key={issue.id}
+  className="border border-neutral-200 rounded overflow-hidden"
+>
+  {/* Issue header — always visible */}
+  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4">
+    <button
+      type="button"
+      onClick={() => toggleIssue(issue.id)}
+      className="min-w-0 flex-1 text-left"
+      aria-expanded={isExpanded}
+    >
+      <p className="text-xs font-mono text-neutral-500">
+        {issue.issueId || issue.id}
+      </p>
 
-                          <select
-                            value={status}
-                            disabled={issueSaving[statusKey]}
-                            onChange={(e) => updateIssueStatus(issue, e.target.value)}
-                            className="shrink-0 border border-neutral-300 rounded px-2 py-2 text-xs bg-white"
-                          >
-                            <option value="open">Open</option>
-                            <option value="in_progress">In progress</option>
-                            <option value="resolved">Resolved</option>
-                            <option value="closed">Closed</option>
-                          </select>
-                        </div>
+      <h3 className="mt-1 font-semibold">
+        {issue.title || "Untitled issue"}
+      </h3>
 
-                        {issue.description && (
-                          <div className="mt-4 p-3 bg-neutral-50 border border-neutral-200 rounded text-sm whitespace-pre-wrap">
-                            {issue.description}
-                          </div>
-                        )}
+      <p className="mt-1 text-xs text-neutral-500">
+        {issue.type === "feature" ? "Feature request" : "Issue"}
+        {" · "}
+        {issue.componentName ||
+          issue.component ||
+          "Unknown component"}
+      </p>
+    </button>
 
-                        <p className="mt-3 text-[11px] text-neutral-400">
-                          User UID: {issue.userId || "—"}
-                          {issue.userEmail ? ` · ${issue.userEmail}` : ""}
-                        </p>
+    <div className="flex items-center gap-2 shrink-0">
+      <select
+        value={status}
+        disabled={issueSaving[statusKey]}
+        onChange={(e) =>
+          updateIssueStatus(issue, e.target.value)
+        }
+        className="border border-neutral-300 rounded px-2 py-2 text-xs bg-white"
+      >
+        <option value="open">Open</option>
+        <option value="in_progress">In progress</option>
+        <option value="resolved">Resolved</option>
+        <option value="closed">Closed</option>
+      </select>
 
-                        <div className="mt-4">
-                          <textarea
-                            value={issueCommentDrafts[issue.id] || ""}
-                            onChange={(e) =>
-                              setIssueCommentDrafts((current) => ({
-                                ...current,
-                                [issue.id]: e.target.value
-                              }))
-                            }
-                            placeholder="Write a reply to the user…"
-                            rows={3}
-                            className="w-full border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => addIssueComment(issue)}
-                            disabled={
-                              !String(issueCommentDrafts[issue.id] || "").trim() ||
-                              issueSaving[commentKey]
-                            }
-                            className="mt-2 px-3 py-2 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
-                          >
-                            {issueSaving[commentKey] ? "Sending…" : "Add admin comment"}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+      <button
+        type="button"
+        onClick={() => toggleIssue(issue.id)}
+        className="h-8 w-8 border border-neutral-300 rounded text-xs hover:bg-neutral-50"
+        aria-label={
+          isExpanded ? "Collapse issue" : "Expand issue"
+        }
+        aria-expanded={isExpanded}
+      >
+        {isExpanded ? "⌃" : "⌄"}
+      </button>
+    </div>
+  </div>
+
+  {/* Issue details — only visible when expanded */}
+  {isExpanded && (
+    <div className="px-4 pb-4">
+      {issue.description && (
+        <div className="mt-2 p-3 bg-neutral-50 border border-neutral-200 rounded text-sm whitespace-pre-wrap">
+          {issue.description}
+        </div>
+      )}
+
+      <p className="mt-3 text-[11px] text-neutral-400">
+        User UID: {issue.userId || "—"}
+        {issue.userEmail ? ` · ${issue.userEmail}` : ""}
+      </p>
+
+      {/* Existing admin comments */}
+      <div className="mt-4">
+        <p className="text-xs font-semibold text-neutral-700 mb-2">
+          Admin comments
+        </p>
+
+        {issueCommentsLoading[issue.id] ? (
+          <p className="text-xs text-neutral-500">
+            Loading comments…
+          </p>
+        ) : issueComments[issue.id]?.length ? (
+          <div className="space-y-2">
+            {issueComments[issue.id].map((comment) => (
+              <div
+                key={comment.id}
+                className="p-3 bg-neutral-50 border border-neutral-200 rounded"
+              >
+                <p className="text-sm whitespace-pre-wrap">
+                  {comment.text}
+                </p>
+
+                <p className="mt-2 text-[10px] text-neutral-400">
+                  {comment.authorEmail || "Administrator"}
+                  {" · "}
+                  {formatDate(comment.createdAt)}
+                </p>
               </div>
-            )}
+            ))}
           </div>
+        ) : (
+          <p className="text-xs text-neutral-400">
+            No admin comments yet.
+          </p>
+        )}
+      </div>
+
+      {/* Add new admin comment */}
+      {feedbackCommentsLoading[item.id] ? (
+  <p className="mt-4 text-xs text-neutral-500">
+    Loading comments…
+  </p>
+) : (
+  <div className="mt-4 space-y-2">
+    {(feedbackComments[item.id] || []).length === 0 ? (
+      <p className="text-xs text-neutral-500">
+        No admin comments yet.
+      </p>
+    ) : (
+      (feedbackComments[item.id] || []).map((comment) => (
+        <div
+          key={comment.id}
+          className="p-3 bg-neutral-50 border border-neutral-200 rounded"
+        >
+          <p className="text-sm whitespace-pre-wrap">
+            {comment.text}
+          </p>
+
+          <p className="mt-1 text-[11px] text-neutral-400">
+            Admin · {formatDate(comment.createdAt)}
+          </p>
+        </div>
+      ))
+    )}
+  </div>
+)}
+
+<div className="mt-4">
+  <textarea
+          value={issueCommentDrafts[issue.id] || ""}
+          onChange={(e) =>
+            setIssueCommentDrafts((current) => ({
+              ...current,
+              [issue.id]: e.target.value
+            }))
+          }
+          placeholder="Write a reply to the user…"
+          rows={3}
+          className="w-full border border-neutral-300 rounded px-3 py-2 text-sm resize-y"
+        />
+
+        <button
+          type="button"
+          onClick={() => addIssueComment(issue)}
+          disabled={
+            !String(
+              issueCommentDrafts[issue.id] || ""
+            ).trim() ||
+            issueSaving[commentKey]
+          }
+          className="mt-2 px-3 py-2 bg-neutral-900 text-white rounded text-xs disabled:opacity-50"
+        >
+          {issueSaving[commentKey]
+            ? "Sending…"
+            : "Add admin comment"}
+        </button>
+      </div>
+    </div>
+  )}
+</div>
         )}
 
         {activeTab === "feedback" && (
@@ -1872,13 +2205,25 @@ const shareInviteLink = async (token) => {
                     const status = item.status || "submitted";
                     const statusKey = `${item.id}:status`;
                     const commentKey = `${item.id}:comment`;
+                    const isExpanded = expandedFeedback === item.id;
 
                     return (
                       <div
                         key={item.id}
                         className="border border-neutral-200 rounded p-4"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                        <div
+  role="button"
+  tabIndex={0}
+  onClick={() => toggleFeedback(item.id)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleFeedback(item.id);
+    }
+  }}
+  className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-4 cursor-pointer hover:bg-neutral-50"
+>
                           <div className="min-w-0">
                             <p className="text-xs font-mono text-neutral-500">
                               {item.feedbackId || item.id}
@@ -1915,6 +2260,9 @@ const shareInviteLink = async (token) => {
                           </select>
                         </div>
 
+                        {isExpanded && (
+
+<>
                         <div className="mt-4 p-3 bg-neutral-50 border border-neutral-200 rounded text-sm whitespace-pre-wrap">
                           {item.message}
                         </div>
@@ -1949,6 +2297,7 @@ const shareInviteLink = async (token) => {
                               : "Add admin comment"}
                           </button>
                         </div>
+                       </> )}
                       </div>
                     );
                   })}
