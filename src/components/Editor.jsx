@@ -823,10 +823,6 @@ let renderedHtml = marked.parse(protectedMarkdown, {
               label || target
           )
           .replace(
-            /`([^`]+)`/g,
-            "$1"
-          )
-          .replace(
             /\*\*\*(.*?)\*\*\*/g,
             "$1"
           )
@@ -1056,24 +1052,57 @@ if (before) {
       const token = match[0];
 
       if (token.startsWith("`")) {
-        const codeText =
-          token.slice(1, -1);
+  const codeText =
+    token.slice(1, -1);
 
-        pdf.setFont(
-          "courier",
-          "normal"
-        );
+  pdf.setFont(
+    "courier",
+    "normal"
+  );
 
-        pdf.text(
-          codeText,
-          currentX,
-          startY
-        );
+  pdf.setFontSize(size);
 
-        currentX += pdf.getTextWidth(
-          codeText
-        );
-      } else {
+  const codeWidth =
+    pdf.getTextWidth(codeText);
+
+  const horizontalPadding = 1.2;
+  const backgroundHeight = 4.6;
+  const backgroundY =
+    startY - 3.5;
+
+  // Inline-code background
+  pdf.setFillColor(
+    235,
+    235,
+    235
+  );
+
+  pdf.roundedRect(
+    currentX - horizontalPadding,
+    backgroundY,
+    codeWidth +
+      horizontalPadding * 2,
+    backgroundHeight,
+    1,
+    1,
+    "F"
+  );
+
+  // Inline-code text
+  pdf.setTextColor(
+    ...palette.text
+  );
+
+  pdf.text(
+    codeText,
+    currentX,
+    startY
+  );
+
+  currentX +=
+    codeWidth +
+    horizontalPadding * 2;
+} else {
         const underlineText =
           token.slice(2, -2);
 
