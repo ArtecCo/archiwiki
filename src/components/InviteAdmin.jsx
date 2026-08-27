@@ -2118,10 +2118,15 @@ const shareInviteLink = async (token) => {
             ? "Sending…"
             : "Add admin comment"}
         </button>
-      </div>
+       </div>
     </div>
   )}
 </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === "feedback" && (
