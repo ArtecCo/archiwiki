@@ -1089,7 +1089,7 @@ const drawInline = (line, startX, startY) => {
         pdf.getTextWidth(codeText);
 
       const leftPadding =
-  codeSize * 0.6;
+  codeSize * 0.08;
 
 const rightPadding =
   codeSize * 0.08;
@@ -1116,6 +1116,13 @@ const backgroundY =
   fontHeightMm * 0.78 -
   verticalPadding;
 
+  const leadingGap =
+  codeSize * 0.08;
+
+currentX +=
+  leftPadding +
+  leadingGap;
+
       /*
        * Background
        */
@@ -1124,6 +1131,7 @@ const backgroundY =
         235,
         235
       );
+
 
       pdf.roundedRect(
   currentX - leftPadding,
@@ -1156,7 +1164,6 @@ const backgroundY =
 
       currentX +=
   codeWidth +
-  leftPadding +
   rightPadding;
     }
 
