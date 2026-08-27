@@ -1092,7 +1092,7 @@ const drawInline = (line, startX, startY) => {
   codeSize * 0.08;
 
 const rightPadding =
-  codeSize * 0.08;
+  codeSize * 0.12;
 /*
  * jsPDF font sizes are in points, while the PDF
  * coordinates used here are in millimetres.
@@ -1117,7 +1117,7 @@ const backgroundY =
   verticalPadding;
 
   const leadingGap =
-  codeSize * 0.08;
+  codeSize * 0.09;
 
 currentX +=
   leftPadding +
