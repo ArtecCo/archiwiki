@@ -1028,7 +1028,7 @@ const drawInline = (line, startX, startY) => {
   let match;
 
   const normalSize = size;
-  const codeSize = size * 0.75;
+  const codeSize = size * 0.78;
 
   while (
     (match = pattern.exec(line)) !== null
@@ -1089,7 +1089,7 @@ const drawInline = (line, startX, startY) => {
         pdf.getTextWidth(codeText);
 
       const leftPadding =
-  codeSize * 0.15;
+  codeSize * 0.6;
 
 const rightPadding =
   codeSize * 0.08;
