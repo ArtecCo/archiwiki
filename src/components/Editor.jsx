@@ -49,6 +49,8 @@ export default function Editor({
   const textareaRef = useRef(null);
   const fontSizeInitializedRef = useRef(false);
 
+  const readerScrollRef = useRef(null);
+  
   /*
    * ---------------------------------------------------------
    * RESPONSIVE DEFAULT FONT SIZE
@@ -169,6 +171,16 @@ export default function Editor({
     setWikiSuggest(null);
     setIsEditing(false);
   }, [note?.id]);
+
+  useEffect(() => {
+  if (!note) return;
+
+  requestAnimationFrame(() => {
+    if (readerScrollRef.current) {
+      readerScrollRef.current.scrollTop = 0;
+    }
+  });
+}, [note?.id]);
 
 useEffect(() => {
   const updateEditorViewport = () => {
@@ -3063,6 +3075,7 @@ return (
       {/* ------------------------------------------------ */}
 
       <div
+      ref={readerScrollRef}
         className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden"
         style={{
           fontSize: `${Number(fontSize || 15)}px`
