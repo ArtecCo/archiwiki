@@ -2900,7 +2900,7 @@ return (
   wordBreak: "break-word",
   whiteSpace: "pre-wrap",
   paddingBottom:
-    "1rem"
+    "0.25rem"
 }}
             />
 

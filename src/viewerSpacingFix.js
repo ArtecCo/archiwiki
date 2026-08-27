@@ -36,8 +36,8 @@ const applyViewerSpacing = () => {
 
     @media (max-width: 767px) {
       div:has(> #print-container) {
-        padding-bottom: 12px !important;
-        margin-bottom: 58px !important;
+        padding-bottom: 0px !important;
+        margin-bottom: 0px !important;
       }
     }
   `;
