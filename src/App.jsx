@@ -1369,21 +1369,25 @@ function MaintenanceScreen({ theme }) {
 }
 
 function ForcePwaScreen() {
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [isIos, setIsIos] = useState(false);
+  const [installPrompt, setInstallPrompt] =
+    useState(null);
+
+  const [isIos, setIsIos] =
+    useState(false);
 
   useEffect(() => {
     const ios =
       /iphone|ipad|ipod/i.test(
-        window.navigator.userAgent
+        navigator.userAgent
       );
 
     setIsIos(ios);
 
-    const handleBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
-    };
+    const handleBeforeInstallPrompt =
+      (event) => {
+        event.preventDefault();
+        setInstallPrompt(event);
+      };
 
     window.addEventListener(
       "beforeinstallprompt",
@@ -1398,16 +1402,16 @@ function ForcePwaScreen() {
     };
   }, []);
 
-  const install = async () => {
+  const handleInstall = async () => {
     if (!installPrompt) return;
 
-    installPrompt.prompt();
-
     try {
+      installPrompt.prompt();
+
       await installPrompt.userChoice;
     } catch (error) {
       console.error(
-        "PWA installation prompt failed:",
+        "PWA installation failed:",
         error
       );
     }
@@ -1418,48 +1422,60 @@ function ForcePwaScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] p-6">
       <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8 text-center">
+
         <h1 className="text-2xl font-bold font-archi tracking-wider">
           ArchiWiki
         </h1>
 
         <p className="mt-3 text-sm text-neutral-600 leading-6">
-          Please install ArchiWiki as an app to continue.
+          Please install ArchiWiki as an app
+          to continue.
         </p>
 
-        {installPrompt ? (
+        {installPrompt && (
           <button
             type="button"
-            onClick={install}
+            onClick={handleInstall}
             className="mt-6 w-full py-2.5 bg-neutral-900 text-white rounded text-sm font-semibold hover:bg-neutral-800"
           >
             Install ArchiWiki
           </button>
-        ) : isIos ? (
+        )}
+
+        {!installPrompt && isIos && (
           <div className="mt-6 text-sm text-neutral-600 leading-6">
             <p>
-              Open this page in Safari, tap the
-              Share button, then choose
+              Open ArchiWiki in Safari.
+            </p>
+
+            <p className="mt-3">
+              Tap <strong>Share</strong> →
               <strong> Add to Home Screen</strong>.
             </p>
 
             <p className="mt-3">
-              Then open ArchiWiki from your Home
-              Screen.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-6 text-sm text-neutral-600 leading-6">
-            <p>
-              Use your browser&apos;s install option
-              to install ArchiWiki as an app.
-            </p>
-
-            <p className="mt-3">
-              Then open ArchiWiki from your Home
-              Screen or installed apps.
+              Then open ArchiWiki from your
+              Home Screen.
             </p>
           </div>
         )}
+
+        {!installPrompt && !isIos && (
+          <div className="mt-6 text-sm text-neutral-600 leading-6">
+            <p>
+              Use your browser&apos;s
+              <strong> Install App</strong> or
+              <strong> Add to Home Screen</strong>
+              option.
+            </p>
+
+            <p className="mt-3">
+              Then open ArchiWiki from your
+              installed apps or Home Screen.
+            </p>
+          </div>
+        )}
+
       </div>
     </div>
   );

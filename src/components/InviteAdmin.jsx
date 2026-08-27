@@ -1471,60 +1471,18 @@ const shareInviteLink = async (token) => {
             </p>
           </div>
 
-          <div className="bg-white border border-neutral-300 rounded p-4 sm:p-6 mb-6">
-  <h2 className="font-semibold">
-    PWA requirement
-  </h2>
-
-  <p className="mt-1 text-xs text-neutral-500 leading-5">
-    Temporarily require users in normal web
-    browsers to install and use ArchiWiki as
-    a PWA.
-  </p>
-
-  <div className="mt-4 flex items-center justify-between gap-4">
-    <div>
-      <div className="text-sm font-medium">
-        Force PWA
-      </div>
-
-      <div className="text-xs text-neutral-500 mt-1">
-        PWA users are not affected.
-      </div>
-    </div>
-
-    <button
-      type="button"
-      disabled={forcePwaSaving}
-      onClick={() =>
-        savePwaGate(!forcePwa)
-      }
-      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-        forcePwa
-          ? "bg-neutral-900"
-          : "bg-neutral-300"
-      }`}
-      aria-pressed={forcePwa}
-      aria-label="Force PWA"
-    >
-      <span
-        className={`inline-block h-5 w-5 mt-0.5 rounded-full bg-white shadow transform transition-transform ${
-          forcePwa
-            ? "translate-x-5"
-            : "translate-x-0.5"
-        }`}
-      />
-    </button>
-  </div>
-
-  {forcePwa && (
-    <p className="mt-4 text-xs text-amber-700">
-      Normal browser users will be asked to
-      install ArchiWiki. Installed PWA users
-      continue normally.
-    </p>
-  )}
-</div>
+          <button
+  type="button"
+  onClick={() => savePwaGate(!forcePwa)}
+  disabled={forcePwaSaving}
+  className={`px-3 py-1 rounded text-xs border transition ${
+    forcePwa
+      ? "bg-neutral-900 text-white border-neutral-900"
+      : "bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50"
+  } disabled:opacity-50`}
+>
+  {forcePwa ? "PWA Required" : "Force PWA"}
+</button>
 
           <div className="flex items-center gap-2">
             <button
