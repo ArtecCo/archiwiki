@@ -1028,7 +1028,7 @@ const drawInline = (line, startX, startY) => {
   let match;
 
   const normalSize = size;
-  const codeSize = size * 0.33;
+  const codeSize = size * 0.66;
 
   while (
     (match = pattern.exec(line)) !== null
@@ -1088,7 +1088,11 @@ const drawInline = (line, startX, startY) => {
       const codeWidth =
         pdf.getTextWidth(codeText);
 
-      const horizontalPadding = codeSize*0.08;
+      const leftPadding =
+  codeSize * 0.15;
+
+const rightPadding =
+  codeSize * 0.08;
 /*
  * jsPDF font sizes are in points, while the PDF
  * coordinates used here are in millimetres.
@@ -1122,15 +1126,16 @@ const backgroundY =
       );
 
       pdf.roundedRect(
-        currentX - horizontalPadding,
-        backgroundY,
-        codeWidth +
-          horizontalPadding * 2,
-        backgroundHeight,
-        1,
-        1,
-        "F"
-      );
+  currentX - leftPadding,
+  backgroundY,
+  codeWidth +
+    leftPadding +
+    rightPadding,
+  backgroundHeight,
+  1,
+  1,
+  "F"
+);
 
       /*
        * Code text
