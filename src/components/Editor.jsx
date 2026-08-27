@@ -1028,7 +1028,7 @@ const drawInline = (line, startX, startY) => {
   let match;
 
   const normalSize = size;
-  const codeSize = size * 0.66;
+  const codeSize = size * 0.75;
 
   while (
     (match = pattern.exec(line)) !== null
