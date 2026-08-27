@@ -1088,10 +1088,29 @@ const drawInline = (line, startX, startY) => {
       const codeWidth =
         pdf.getTextWidth(codeText);
 
-      const horizontalPadding = 1.2;
-      const backgroundHeight = 4.2;
-      const backgroundY =
-        startY - 3.1;
+      const horizontalPadding = codeSize*0.08;
+/*
+ * jsPDF font sizes are in points, while the PDF
+ * coordinates used here are in millimetres.
+ */
+const fontHeightMm =
+  codeSize * 25.4 / 72;
+
+/*
+ * Keep the background proportional to the
+ * actual inline-code font size.
+ */
+const verticalPadding =
+  fontHeightMm * 0.18;
+
+const backgroundHeight =
+  fontHeightMm +
+  verticalPadding * 2;
+
+const backgroundY =
+  startY -
+  fontHeightMm * 0.78 -
+  verticalPadding;
 
       /*
        * Background
@@ -1130,7 +1149,7 @@ const drawInline = (line, startX, startY) => {
         startY
       );
 
-      currentX +=
+      currentX += horizontalPadding * 4 + 
         codeWidth +
         horizontalPadding * 2;
     }
@@ -1178,7 +1197,7 @@ const drawInline = (line, startX, startY) => {
         startY + 0.8
       );
 
-      currentX += 1.2 + textWidth + 1.2;
+      currentX += textWidth;
     }
 
     cursor =
