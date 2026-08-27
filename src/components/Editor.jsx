@@ -1123,6 +1123,7 @@ if (remaining) {
     );
   }
 }
+  };
 
   lines.forEach(
     (line, index) => {
