@@ -177,7 +177,10 @@ export default function Editor({
 
   requestAnimationFrame(() => {
     if (readerScrollRef.current) {
-      readerScrollRef.current.scrollTop = 0;
+      readerScrollRef.current.scrollTo({
+  top: 0,
+  behavior: "smooth"
+});
     }
   });
 }, [note?.id]);
@@ -3076,7 +3079,7 @@ return (
 
       <div
       ref={readerScrollRef}
-        className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden"
+        className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden scroll-smooth"
         style={{
           fontSize: `${Number(fontSize || 15)}px`
         }}
