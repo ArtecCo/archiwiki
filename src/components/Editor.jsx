@@ -1028,7 +1028,7 @@ const drawInline = (line, startX, startY) => {
   let match;
 
   const normalSize = size;
-  const codeSize = size * 0.78;
+  const codeSize = size * 0.33;
 
   while (
     (match = pattern.exec(line)) !== null
@@ -1178,7 +1178,7 @@ const drawInline = (line, startX, startY) => {
         startY + 0.8
       );
 
-      currentX += textWidth + 1.2;
+      currentX += 1.2 + textWidth + 1.2;
     }
 
     cursor =
