@@ -1368,11 +1368,125 @@ function MaintenanceScreen({ theme }) {
   );
 }
 
+function ForcePwaScreen() {
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isIos, setIsIos] = useState(false);
+
+  useEffect(() => {
+    const ios =
+      /iphone|ipad|ipod/i.test(
+        window.navigator.userAgent
+      );
+
+    setIsIos(ios);
+
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+
+    window.addEventListener(
+      "beforeinstallprompt",
+      handleBeforeInstallPrompt
+    );
+
+    return () => {
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt
+      );
+    };
+  }, []);
+
+  const install = async () => {
+    if (!installPrompt) return;
+
+    installPrompt.prompt();
+
+    try {
+      await installPrompt.userChoice;
+    } catch (error) {
+      console.error(
+        "PWA installation prompt failed:",
+        error
+      );
+    }
+
+    setInstallPrompt(null);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] p-6">
+      <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8 text-center">
+        <h1 className="text-2xl font-bold font-archi tracking-wider">
+          ArchiWiki
+        </h1>
+
+        <p className="mt-3 text-sm text-neutral-600 leading-6">
+          Please install ArchiWiki as an app to continue.
+        </p>
+
+        {installPrompt ? (
+          <button
+            type="button"
+            onClick={install}
+            className="mt-6 w-full py-2.5 bg-neutral-900 text-white rounded text-sm font-semibold hover:bg-neutral-800"
+          >
+            Install ArchiWiki
+          </button>
+        ) : isIos ? (
+          <div className="mt-6 text-sm text-neutral-600 leading-6">
+            <p>
+              Open this page in Safari, tap the
+              Share button, then choose
+              <strong> Add to Home Screen</strong>.
+            </p>
+
+            <p className="mt-3">
+              Then open ArchiWiki from your Home
+              Screen.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6 text-sm text-neutral-600 leading-6">
+            <p>
+              Use your browser&apos;s install option
+              to install ArchiWiki as an app.
+            </p>
+
+            <p className="mt-3">
+              Then open ArchiWiki from your Home
+              Screen or installed apps.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const pathname = window.location.pathname;
+
   const [maintenance, setMaintenance] = useState(false);
-  const [maintenanceChecked, setMaintenanceChecked] = useState(false);
-  const [theme] = useState(() => localStorage.getItem("archiwiki-theme") || "beige");
+  const [maintenanceChecked, setMaintenanceChecked] =
+    useState(false);
+
+  const [forcePwa, setForcePwa] =
+    useState(false);
+
+  const [forcePwaChecked, setForcePwaChecked] =
+    useState(false);
+
+  const [isStandalone, setIsStandalone] =
+    useState(false);
+
+  const [theme] = useState(
+    () =>
+      localStorage.getItem(
+        "archiwiki-theme"
+      ) || "beige"
+  );
 
   useEffect(() => {
     const loader = document.getElementById("archiwiki-loader");
@@ -1411,7 +1525,84 @@ function App() {
     return () => clearTimeout(timer);
   }, [maintenanceChecked]);
 
-  if (pathname === "/invite-admin") return <InviteAdmin />;
+  useEffect(() => {
+  const standalone =
+    window.matchMedia(
+      "(display-mode: standalone)"
+    ).matches ||
+    window.navigator.standalone === true;
+
+  setIsStandalone(standalone);
+
+  // Installed PWAs don't need the gate.
+  if (standalone) {
+    setForcePwaChecked(true);
+    return;
+  }
+
+  let mounted = true;
+
+  getDoc(
+    doc(
+      db,
+      "adminMetrics",
+      "pwaGate"
+    )
+  )
+    .then((snapshot) => {
+      if (!mounted) return;
+
+      setForcePwa(
+        snapshot.exists() &&
+          snapshot.data()?.enabled === true
+      );
+    })
+    .catch((error) => {
+      console.error(
+        "PWA gate check failed:",
+        error
+      );
+
+      // Fail open if the setting cannot be read.
+      setForcePwa(false);
+    })
+    .finally(() => {
+      if (mounted) {
+        setForcePwaChecked(true);
+      }
+    });
+
+  return () => {
+    mounted = false;
+  };
+}, []);
+
+  // Admin must remain accessible so the administrator
+// can turn the temporary PWA requirement off.
+if (pathname === "/invite-admin") {
+  return <InviteAdmin />;
+}
+
+if (
+  !maintenanceChecked ||
+  !forcePwaChecked
+) {
+  return null;
+}
+
+if (maintenance) {
+  return (
+    <MaintenanceScreen
+      theme={theme}
+    />
+  );
+}
+
+// Never show the PWA gate when already running
+// as an installed web app.
+if (forcePwa && !isStandalone) {
+  return <ForcePwaScreen />;
+}
 
 if (pathname === "/guide") {
   return <Guide theme={theme} />;
@@ -1425,9 +1616,9 @@ if (pathname === "/tickets") {
   return <Tickets theme={theme} />;
 }
 
-if (!maintenanceChecked) return null;
-if (maintenance) return <MaintenanceScreen theme={theme} />;
 return <ArchiWikiApp />;
+
+
 }
 
 export default App;

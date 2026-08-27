@@ -93,7 +93,11 @@ const [newInviteToken, setNewInviteToken] = useState("");
   const [notificationPriority, setNotificationPriority] = useState("low");
   const [notificationIcon, setNotificationIcon] = useState("Bell");
   const [notificationSaving, setNotificationSaving] = useState(false);
+const [forcePwa, setForcePwa] =
+  useState(false);
 
+const [forcePwaSaving, setForcePwaSaving] =
+  useState(false);
   const [activeTab, setActiveTab] = useState("stats");
   const [stats, setStats] = useState({ notes: 0, folders: 0 });
   const [statsLoading, setStatsLoading] = useState(false);
@@ -120,9 +124,38 @@ const [newInviteToken, setNewInviteToken] = useState("");
 
   const notificationIconComponents = { Bell, Megaphone, Info, AlertTriangle, AlertCircle };
   const notificationRef = doc(db, "adminMetrics", "notification");
+  const pwaGateRef = doc(
+  db,
+  "adminMetrics",
+  "pwaGate"
+);
 
   const maintenanceRef = doc(db, "adminMetrics", "maintenance");
   const helpContentRef = doc(db, "adminContent", "help");
+
+  const loadPwaGate = async () => {
+  if (!authorized) return;
+
+  try {
+    const snapshot =
+      await getDoc(pwaGateRef);
+
+    setForcePwa(
+      snapshot.exists() &&
+        snapshot.data()?.enabled === true
+    );
+  } catch (err) {
+    console.error(
+      "Failed to load PWA gate:",
+      err
+    );
+
+    setError(
+      err?.message ||
+        "Unable to load PWA gate setting."
+    );
+  }
+};
 
   const loadStats = async () => {
     if (!authorized) return;
@@ -154,7 +187,56 @@ const [newInviteToken, setNewInviteToken] = useState("");
     if (activeTab === "components") loadComponents();
     if (activeTab === "issues") loadIssues();
     if (activeTab === "feedback") loadFeedback();
+    if (activeTab === "settings")
+  loadPwaGate();
   }, [authorized, activeTab]);
+
+  const savePwaGate = async (
+  enabled
+) => {
+  if (
+    !authorized ||
+    forcePwaSaving
+  ) {
+    return;
+  }
+
+  setForcePwaSaving(true);
+  setError("");
+
+  try {
+    await setDoc(
+      pwaGateRef,
+      {
+        enabled,
+        updatedAt:
+          serverTimestamp(),
+        updatedBy: user.uid
+      },
+      { merge: true }
+    );
+
+    setForcePwa(enabled);
+
+    setMessage(
+      enabled
+        ? "PWA requirement enabled."
+        : "PWA requirement disabled."
+    );
+  } catch (err) {
+    console.error(
+      "Failed to save PWA gate:",
+      err
+    );
+
+    setError(
+      err?.message ||
+        "Unable to update PWA requirement."
+    );
+  } finally {
+    setForcePwaSaving(false);
+  }
+};
 
 
   const loadHelpContent = async () => {
@@ -1389,6 +1471,61 @@ const shareInviteLink = async (token) => {
             </p>
           </div>
 
+          <div className="bg-white border border-neutral-300 rounded p-4 sm:p-6 mb-6">
+  <h2 className="font-semibold">
+    PWA requirement
+  </h2>
+
+  <p className="mt-1 text-xs text-neutral-500 leading-5">
+    Temporarily require users in normal web
+    browsers to install and use ArchiWiki as
+    a PWA.
+  </p>
+
+  <div className="mt-4 flex items-center justify-between gap-4">
+    <div>
+      <div className="text-sm font-medium">
+        Force PWA
+      </div>
+
+      <div className="text-xs text-neutral-500 mt-1">
+        PWA users are not affected.
+      </div>
+    </div>
+
+    <button
+      type="button"
+      disabled={forcePwaSaving}
+      onClick={() =>
+        savePwaGate(!forcePwa)
+      }
+      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+        forcePwa
+          ? "bg-neutral-900"
+          : "bg-neutral-300"
+      }`}
+      aria-pressed={forcePwa}
+      aria-label="Force PWA"
+    >
+      <span
+        className={`inline-block h-5 w-5 mt-0.5 rounded-full bg-white shadow transform transition-transform ${
+          forcePwa
+            ? "translate-x-5"
+            : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  </div>
+
+  {forcePwa && (
+    <p className="mt-4 text-xs text-amber-700">
+      Normal browser users will be asked to
+      install ArchiWiki. Installed PWA users
+      continue normally.
+    </p>
+  )}
+</div>
+
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1923,6 +2060,9 @@ const shareInviteLink = async (token) => {
         </div>
                 )}
 
+                {activeTab === "invitations" && (
+          <>
+
         <div className="bg-white border border-neutral-300 rounded p-6 mb-6">
           <h2 className="font-semibold mb-2">
             Create invitation
@@ -2163,7 +2303,9 @@ const shareInviteLink = async (token) => {
 
           )}
 
-        </div>
+                    </div>
+          </>
+        )}
 
       </div>
 
