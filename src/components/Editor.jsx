@@ -1092,7 +1092,13 @@ const drawInline = (line, startX, startY) => {
   codeSize * 0.08;
 
 const rightPadding =
-  codeSize * 0.12;
+  codeSize * 0.08;
+
+const leadingGap =
+  codeSize * 0.09;
+
+const trailingGap =
+  codeSize * 0.09;
 /*
  * jsPDF font sizes are in points, while the PDF
  * coordinates used here are in millimetres.
@@ -1115,9 +1121,6 @@ const backgroundY =
   startY -
   fontHeightMm * 0.78 -
   verticalPadding;
-
-  const leadingGap =
-  codeSize * 0.09;
 
 currentX +=
   leftPadding +
@@ -1157,14 +1160,15 @@ currentX +=
       pdf.setTextColor(...palette.text);
 
       pdf.text(
-        codeText,
-        currentX,
-        startY
-      );
+  codeText,
+  currentX,
+  startY
+);
 
-      currentX +=
+currentX +=
   codeWidth +
-  rightPadding;
+  rightPadding +
+  trailingGap;
     }
 
     /*
