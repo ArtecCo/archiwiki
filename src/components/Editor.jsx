@@ -1436,6 +1436,147 @@ currentX +=
         }
       };
 
+      const addTaskItem = (
+  value,
+  checked,
+  level
+) => {
+  const indent =
+    Math.min(level, 4) * 5;
+
+  const size = 11;
+  const lineHeight = 5.6;
+
+  const checkboxSize = 3.2;
+  const checkboxX =
+    marginLeft + indent;
+
+  const textX =
+    checkboxX +
+    checkboxSize +
+    2.5;
+
+  const textWidth =
+    contentWidth -
+    indent -
+    checkboxSize -
+    2.5;
+
+  const lines = wrap(
+    value,
+    size,
+    "times",
+    "normal",
+    textWidth
+  );
+
+  if (
+    y + lineHeight >
+    bodyBottom
+  ) {
+    newPage();
+  }
+
+  /*
+   * Static checkbox
+   */
+  pdf.setDrawColor(
+    ...palette.text
+  );
+
+  pdf.setLineWidth(0.35);
+
+  if (checked) {
+    pdf.setFillColor(
+      ...palette.text
+    );
+
+    pdf.roundedRect(
+      checkboxX,
+      y + 0.9,
+      checkboxSize,
+      checkboxSize,
+      0.5,
+      0.5,
+      "FD"
+    );
+
+    /*
+     * White check mark.
+     */
+    pdf.setDrawColor(
+      255,
+      255,
+      255
+    );
+
+    pdf.setLineWidth(0.45);
+
+    pdf.line(
+      checkboxX + 0.75,
+      y + 2.45,
+      checkboxX + 1.35,
+      y + 3.0
+    );
+
+    pdf.line(
+      checkboxX + 1.35,
+      y + 3.0,
+      checkboxX + 2.55,
+      y + 1.55
+    );
+  } else {
+    pdf.setFillColor(
+      255,
+      255,
+      255
+    );
+
+    pdf.roundedRect(
+      checkboxX,
+      y + 0.9,
+      checkboxSize,
+      checkboxSize,
+      0.5,
+      0.5,
+      "FD"
+    );
+  }
+
+  /*
+   * Task text
+   */
+  pdf.setFont(
+    "times",
+    "normal"
+  );
+
+  pdf.setFontSize(size);
+
+  pdf.setTextColor(
+    ...palette.text
+  );
+
+  lines.forEach(
+    (line, idx) => {
+      pdf.text(
+        line,
+        textX,
+        y +
+          idx *
+            lineHeight +
+          3.5
+      );
+    }
+  );
+
+  y +=
+    lines.length *
+      lineHeight +
+    2;
+};
+
+
       const addListItem = (
         value,
         ordered,
@@ -2059,6 +2200,30 @@ currentX +=
 
             continue;
           }
+
+          const task =
+  raw.match(
+    /^(\s*)[-*+]\s+\[([ xX])\]\s+(.+)$/
+  );
+
+if (task) {
+  const level =
+    Math.floor(
+      task[1].length / 2
+    );
+
+  const checked =
+    task[2].toLowerCase() === "x";
+
+  addTaskItem(
+    task[3],
+    checked,
+    level
+  );
+
+  index += 1;
+  continue;
+}
 
           const unordered =
             raw.match(
@@ -3288,6 +3453,75 @@ return (
 
             <style>
   {`
+
+ #print-container input[type="checkbox"] {
+  pointer-events: none;
+  cursor: default;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  width: 0.9em;
+  height: 0.9em;
+
+  margin: 0 0.45em 0 0;
+
+  vertical-align: -0.08em;
+  flex: 0 0 auto;
+
+  border: 1.5px solid #000000;
+  border-radius: 2px;
+
+  background-color: transparent;
+
+  position: relative;
+  opacity: 1;
+}
+
+#print-container input[type="checkbox"]:checked {
+  background-color: #000000;
+  border-color: #000000;
+}
+
+#print-container input[type="checkbox"]:checked::after {
+  content: "";
+
+  position: absolute;
+
+  left: 0.2em;
+  top: 0.02em;
+
+  width: 0.28em;
+  height: 0.55em;
+
+  border: solid #ffffff;
+  border-width: 0 1.5px 1.5px 0;
+
+  transform: rotate(45deg);
+}
+
+#print-container table th[align="left"],
+#print-container table td[align="left"],
+#print-container table th[style*="text-align: left"],
+#print-container table td[style*="text-align: left"] {
+  text-align: left;
+}
+
+#print-container table th[align="center"],
+#print-container table td[align="center"],
+#print-container table th[style*="text-align: center"],
+#print-container table td[style*="text-align: center"] {
+  text-align: center;
+}
+
+#print-container table th[align="right"],
+#print-container table td[align="right"],
+#print-container table th[style*="text-align: right"],
+#print-container table td[style*="text-align: right"] {
+  text-align: right;
+}
+
+
     #print-container,
     #print-container * {
       min-width: 0;
