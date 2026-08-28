@@ -442,6 +442,12 @@ export default function Guide({ theme = "beige" }) {
 
   transform: rotate(45deg);
 }
+
+.archiwiki-guide li:has(input[type="checkbox"]) {
+  list-style-type: none;
+  padding-left: 0;
+}
+  
         /* ---------------------------------------------
            IMAGES
            --------------------------------------------- */

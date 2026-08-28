@@ -3500,6 +3500,11 @@ return (
   transform: rotate(45deg);
 }
 
+#print-container li:has(input[type="checkbox"]) {
+  list-style-type: none;
+  padding-left: 0;
+}
+
 #print-container table th[align="left"],
 #print-container table td[align="left"],
 #print-container table th[style*="text-align: left"],
