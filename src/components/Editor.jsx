@@ -663,6 +663,11 @@ let renderedHtml = marked.parse(protectedMarkdown, {
   breaks: true
 });
 
+renderedHtml = renderedHtml.replace(
+  /<table>([\s\S]*?)<\/table>/g,
+  '<div class="table-scroll-wrapper"><table>$1</table></div>'
+);
+
   // Turn the protected placeholders back into wiki links.
   renderedHtml = renderedHtml.replace(
     /WIKILINKPLACEHOLDER(\d+)WIKILINKPLACEHOLDER/g,
@@ -2635,7 +2640,7 @@ currentX +=
                   onClick={() => {
                     const targetIndex = index;
                     setMobileReaderPanel?.("article");
-                    window.setTimeout(() => {
+                    window.requestAnimationFrame(() => {
   const heading = document
     .getElementById("print-container")
     ?.querySelectorAll("h1,h2,h3,h4,h5,h6")
@@ -2644,7 +2649,7 @@ currentX +=
   if (heading) {
     scrollToHeading(heading);
   }
-}, 50);
+});
                   }}
                   className={`w-full text-left py-2 rounded px-2 ${colors.buttonHover}`}
                   style={{ paddingLeft: `${8 + (heading.level - 1) * 14}px` }}
@@ -3282,53 +3287,56 @@ return (
             </div>
 
             <style>
-              {`
-                #print-container,
-                #print-container * {
-                  min-width: 0;
-                  max-width: 100%;
-                  overflow-wrap: anywhere;
-                  word-break: break-word;
-                }
+  {`
+    #print-container,
+    #print-container * {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
 
-                #print-container pre,
-                #print-container code {
-                  white-space: pre-wrap;
-                  overflow-wrap: anywhere;
-                  word-break: break-word;
-                  max-width: 100%;
-                }
+    #print-container pre,
+    #print-container code {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      max-width: 100%;
+    }
 
-                #print-container table {
-  width: max-content;
-  min-width: 100%;
-  max-width: none;
-  table-layout: auto;
-}
+    #print-container .table-scroll-wrapper {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
 
-#print-container table th,
-#print-container table td {
-  overflow-wrap: normal;
-  word-break: normal;
-}
+    #print-container .table-scroll-wrapper table {
+      width: max-content;
+      min-width: 100%;
+      max-width: none;
+      table-layout: auto;
+    }
 
-                #print-container td,
-                #print-container th {
-                  overflow-wrap: anywhere;
-                  word-break: break-word;
-                }
+    #print-container .table-scroll-wrapper td,
+    #print-container .table-scroll-wrapper th {
+      max-width: 400px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
 
-                #print-container img {
-                  max-width: 100%;
-                  height: auto;
-                }
+    #print-container img {
+      max-width: 100%;
+      height: auto;
+    }
 
-                #print-container a {
-                  overflow-wrap: anywhere;
-                  word-break: break-word;
-                }
-              `}
-            </style>
+    #print-container a {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  `}
+</style>
           </div>
         )}
       </div>
