@@ -80,10 +80,16 @@ export default function Guide({ theme = "beige" }) {
       }
     );
 
+    
+
     let html = marked.parse(markdownWithTokens, {
       gfm: true,
       breaks: false,
     });
+    html = html.replace(
+  /<table>([\s\S]*?)<\/table>/g,
+  '<div class="table-scroll-wrapper"><table>$1</table></div>'
+);
 
     underlineTokens.forEach((text, index) => {
       const token = `ARCHIWIKI_UNDERLINE_TOKEN_${index}_END`;
@@ -323,30 +329,118 @@ export default function Guide({ theme = "beige" }) {
            TABLES
            --------------------------------------------- */
 
-        .archiwiki-guide   {
+           
+
+/* ---------------------------------------------
+   TABLES
+   --------------------------------------------- */
+
+.archiwiki-guide .table-scroll-wrapper {
   width: 100%;
   max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   margin: 1.25rem 0;
-  border-collapse: collapse;
-  table-layout: fixed;
 }
 
-.archiwiki-guide th,
-.archiwiki-guide td {
+.archiwiki-guide .table-scroll-wrapper table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.archiwiki-guide .table-scroll-wrapper th,
+.archiwiki-guide .table-scroll-wrapper td {
   padding: 0.5rem 0.75rem;
   border: 1px solid
     ${dark ? "#525252" : "#d4d4d4"};
-  text-align: left;
   vertical-align: top;
+  max-width: 400px;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.archiwiki-guide th {
+.archiwiki-guide .table-scroll-wrapper th {
   font-weight: 700;
   background: ${dark
     ? "rgba(255, 255, 255, 0.06)"
     : "rgba(0, 0, 0, 0.04)"};
+}
+
+/* Table alignment */
+
+.archiwiki-guide .table-scroll-wrapper th[align="left"],
+.archiwiki-guide .table-scroll-wrapper td[align="left"],
+.archiwiki-guide .table-scroll-wrapper th[style*="text-align: left"],
+.archiwiki-guide .table-scroll-wrapper td[style*="text-align: left"] {
+  text-align: left;
+}
+
+.archiwiki-guide .table-scroll-wrapper th[align="center"],
+.archiwiki-guide .table-scroll-wrapper td[align="center"],
+.archiwiki-guide .table-scroll-wrapper th[style*="text-align: center"],
+.archiwiki-guide .table-scroll-wrapper td[style*="text-align: center"] {
+  text-align: center;
+}
+
+.archiwiki-guide .table-scroll-wrapper th[align="right"],
+.archiwiki-guide .table-scroll-wrapper td[align="right"],
+.archiwiki-guide .table-scroll-wrapper th[style*="text-align: right"],
+.archiwiki-guide .table-scroll-wrapper td[style*="text-align: right"] {
+  text-align: right;
+}
+
+/* ---------------------------------------------
+   CHECKBOXES
+   --------------------------------------------- */
+
+.archiwiki-guide input[type="checkbox"] {
+  pointer-events: none;
+  cursor: default;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  width: 0.9em;
+  height: 0.9em;
+
+  margin: 0 0.45em 0 0;
+
+  vertical-align: -0.08em;
+  flex: 0 0 auto;
+
+  border: 1.5px solid #000000;
+  border-radius: 2px;
+
+  background-color: transparent;
+
+  position: relative;
+  opacity: 1;
+}
+
+.archiwiki-guide input[type="checkbox"]:checked {
+  background-color: #000000;
+  border-color: #000000;
+}
+
+.archiwiki-guide input[type="checkbox"]:checked::after {
+  content: "";
+
+  position: absolute;
+
+  left: 0.2em;
+  top: 0.02em;
+
+  width: 0.28em;
+  height: 0.55em;
+
+  border: solid #ffffff;
+  border-width: 0 1.5px 1.5px 0;
+
+  transform: rotate(45deg);
 }
         /* ---------------------------------------------
            IMAGES
