@@ -665,7 +665,7 @@ let renderedHtml = marked.parse(protectedMarkdown, {
 
 renderedHtml = renderedHtml.replace(
   /<table>([\s\S]*?)<\/table>/g,
-  '<div class=table-scroll-wrapper viewer-scrollbar""><table>$1</table></div>'
+  '<div class="table-scroll-wrapper viewer-scrollbar"><table>$1</table></div>'
 );
 
   // Turn the protected placeholders back into wiki links.
