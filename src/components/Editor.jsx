@@ -49,8 +49,6 @@ export default function Editor({
   const textareaRef = useRef(null);
   const fontSizeInitializedRef = useRef(false);
 
-  const readerScrollRef = useRef(null);
-  
   /*
    * ---------------------------------------------------------
    * RESPONSIVE DEFAULT FONT SIZE
@@ -74,7 +72,7 @@ export default function Editor({
       "(max-width: 639px)"
     ).matches;
 
-    setFontSize?.(isPhone ? 14 : 15);
+    setFontSize?.(isPhone ? 16 : 15);
   }, [setFontSize]);
 
   /*
@@ -163,6 +161,21 @@ export default function Editor({
    * ---------------------------------------------------------
    */
 
+  //Custom tab name start
+
+  useEffect(() => {
+  document.title = note?.title?.trim()
+    ? note.title.trim()
+    : "ArchiWiki";
+
+  return () => {
+    document.title = "ArchiWiki";
+  };
+}, [note?.id, note?.title]);
+
+//custom tab name end
+
+
   useEffect(() => {
     if (!note) return;
 
@@ -171,19 +184,6 @@ export default function Editor({
     setWikiSuggest(null);
     setIsEditing(false);
   }, [note?.id]);
-
-  useEffect(() => {
-  if (!note) return;
-
-  requestAnimationFrame(() => {
-    if (readerScrollRef.current) {
-      readerScrollRef.current.scrollTo({
-  top: 0,
-  behavior: "smooth"
-});
-    }
-  });
-}, [note?.id]);
 
 useEffect(() => {
   const updateEditorViewport = () => {
@@ -3078,8 +3078,7 @@ return (
       {/* ------------------------------------------------ */}
 
       <div
-      ref={readerScrollRef}
-        className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden scroll-smooth"
+        className="flex-1 min-h-0 min-w-0 flex flex-col p-8 max-md:p-4 overflow-y-auto overflow-x-hidden"
         style={{
           fontSize: `${Number(fontSize || 15)}px`
         }}
@@ -3301,12 +3300,17 @@ return (
                 }
 
                 #print-container table {
-                  width: 100%;
-                  max-width: 100%;
-                  table-layout: fixed;
-                  overflow-wrap: anywhere;
-                  word-break: break-word;
-                }
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  table-layout: auto;
+}
+
+#print-container table th,
+#print-container table td {
+  overflow-wrap: normal;
+  word-break: normal;
+}
 
                 #print-container td,
                 #print-container th {
