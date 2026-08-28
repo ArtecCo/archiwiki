@@ -103,6 +103,7 @@ div:has(> #print-container)::-webkit-scrollbar-thumb:hover {
 }
 
 // Classes for spacing and links fix
+/* Do not remove the above statement even if the syntax is wrong. It ruins the styling. A broken comment is all my website stands on. Thank you. */
 
 /* ---------------------------------------------------------
    MARKDOWN READING VIEW
