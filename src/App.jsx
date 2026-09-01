@@ -95,7 +95,10 @@ function ArchiWikiApp() {
   const [fontSize, setFontSize] = useState(16);
   const [notification, setNotification] = useState(null);
     const [isImporting, setIsImporting] = useState(false);
+const [backupMenuOpen, setBackupMenuOpen] = useState(false);
 
+
+const backupMenuRef = useRef(null);
 
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("archiwiki-theme") || "beige";
@@ -105,6 +108,29 @@ function ArchiWikiApp() {
   const [mobileReaderPanel, setMobileReaderPanel] = useState("article");
   const [dialog, setDialog] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (
+      backupMenuRef.current &&
+      !backupMenuRef.current.contains(event.target)
+    ) {
+      setBackupMenuOpen(false);
+    }
+  };
+
+  document.addEventListener(
+    "mousedown",
+    handleClickOutside
+  );
+
+  return () => {
+    document.removeEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+  };
+}, []);
 
   useEffect(() => {
     localStorage.setItem("archiwiki-theme", theme);
@@ -1390,30 +1416,40 @@ const handleImportBackup = async (event) => {
               </select>
             </div>
 
-            <div className="relative">
-  <details className="relative">
-    <summary
-      className={`list-none cursor-pointer flex items-center py-1 px-2.5 border rounded gap-1 ${shellTheme.button}`}
-    >
-      <Share2 size={12} />
+            <div
+  ref={backupMenuRef}
+  className="relative"
+>
+  <button
+    type="button"
+    onClick={() =>
+      setBackupMenuOpen((open) => !open)
+    }
+    className={`flex items-center py-1 px-2.5 border rounded gap-1 ${shellTheme.button}`}
+  >
+    <Share2 size={12} />
 
-      <span className="hidden sm:inline">
-        Backup
-      </span>
+    <span className="hidden sm:inline">
+      Backup
+    </span>
 
-      <span className="sm:hidden">
-        Backup
-      </span>
+    <span className="sm:hidden">
+      Backup
+    </span>
 
-      <ChevronDown size={12} />
-    </summary>
+    <ChevronDown size={12} />
+  </button>
 
+  {backupMenuOpen && (
     <div
       className={`absolute right-0 mt-1 z-50 min-w-[160px] rounded border shadow-lg overflow-hidden ${shellTheme.select}`}
     >
       <button
         type="button"
-        onClick={exportAllToZip}
+        onClick={() => {
+          exportAllToZip();
+          setBackupMenuOpen(false);
+        }}
         className="w-full text-left px-3 py-2 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
       >
         Export backup
@@ -1423,8 +1459,12 @@ const handleImportBackup = async (event) => {
         type="button"
         disabled={isImporting}
         onClick={() => {
+          setBackupMenuOpen(false);
+
           document
-            .getElementById("archiwiki-import-file")
+            .getElementById(
+              "archiwiki-import-file"
+            )
             ?.click();
         }}
         className="w-full text-left px-3 py-2 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50"
@@ -1434,7 +1474,7 @@ const handleImportBackup = async (event) => {
           : "Import backup"}
       </button>
     </div>
-  </details>
+  )}
 </div>
 
             <button
