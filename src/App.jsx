@@ -11,7 +11,8 @@ import {
   deleteDoc,
   query,
   where,
-  getDoc
+  getDoc,
+  writeBatch
 } from "firebase/firestore";
 import { encryptData, decryptData } from "./crypto";
 import InviteAdmin from "./components/InviteAdmin";
@@ -21,7 +22,7 @@ import Tickets from "./components/Tickets";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import GraphView from "./components/GraphView";
-import { LogOut, Share2, Menu, ListTree, Link2, Network } from "lucide-react";
+import { LogOut, Share2, Menu, ListTree, Link2, Network, ChevronDown } from "lucide-react";
 
 function ArchiWikiApp() {
   useEffect(() => {
@@ -93,6 +94,8 @@ function ArchiWikiApp() {
   const [pendingNotes, setPendingNotes] = useState([]);
   const [fontSize, setFontSize] = useState(16);
   const [notification, setNotification] = useState(null);
+    const [isImporting, setIsImporting] = useState(false);
+
 
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem("archiwiki-theme") || "beige";
@@ -510,28 +513,256 @@ function ArchiWikiApp() {
   };
 
   // Compile entire decrypted project as a JSON backup.
-  const exportAllToZip = () => {
-    const files = decryptedNotes.map((note) => {
-      const path = getFolderPath(note.folderId);
+const exportAllToZip = () => {
+  const backup = {
+    type: "archiwiki-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
 
-      return {
-        name: `${path}/${note.title}.md`,
-        content: `# ${note.title}\n\n${note.body}`
-      };
-    });
+    folders: folders.map((folder) => ({
+      id: folder.id,
+      name: folder.name,
+      parentId: folder.parentId ?? null,
+      createdAt: folder.createdAt ?? null
+    })),
 
-    console.log("Mock backup generated", files);
-
-    const link = document.createElement("a");
-    const jsonStr = JSON.stringify(files, null, 2);
-
-    link.href =
-      "data:text/plain;charset=utf-8," +
-      encodeURIComponent(jsonStr);
-
-    link.download = "scribe-notebook-backup.json";
-    link.click();
+    notes: decryptedNotes.map((note) => ({
+      id: note.id,
+      folderId: note.folderId ?? null,
+      title: note.title || "",
+      body: note.body || "",
+      updatedAt: note.updatedAt ?? null
+    }))
   };
+
+  const jsonStr = JSON.stringify(
+    backup,
+    null,
+    2
+  );
+
+  const blob = new Blob(
+    [jsonStr],
+    { type: "application/json" }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "archiwiki-backup.json";
+  link.click();
+
+  URL.revokeObjectURL(url);
+};
+
+const handleImportBackup = async (event) => {
+  const file = event.target.files?.[0];
+
+  // Allow the same file to be selected again later.
+  event.target.value = "";
+
+  if (!file) return;
+
+  try {
+    setIsImporting(true);
+
+    const text = await file.text();
+
+    let backup;
+
+    try {
+      backup = JSON.parse(text);
+    } catch {
+      window.alert(
+        "This file is not valid JSON."
+      );
+      return;
+    }
+
+    // Verify that this is an ArchiWiki backup.
+    if (
+      !backup ||
+      backup.type !== "archiwiki-backup" ||
+      backup.version !== 1
+    ) {
+      window.alert(
+        "This is not a valid ArchiWiki backup file."
+      );
+      return;
+    }
+
+    // Verify the expected backup structure.
+    if (
+      !Array.isArray(backup.folders) ||
+      !Array.isArray(backup.notes)
+    ) {
+      window.alert(
+        "The backup file is incomplete or invalid."
+      );
+      return;
+    }
+
+    // Validate every folder.
+    const validFolders = backup.folders.filter(
+      (folder) =>
+        folder &&
+        typeof folder.id === "string" &&
+        typeof folder.name === "string"
+    );
+
+    // Validate every note.
+    const validNotes = backup.notes.filter(
+      (note) =>
+        note &&
+        typeof note.id === "string" &&
+        typeof note.title === "string" &&
+        typeof note.body === "string"
+    );
+
+    if (
+      validFolders.length !==
+        backup.folders.length ||
+      validNotes.length !==
+        backup.notes.length
+    ) {
+      window.alert(
+        "The backup contains invalid items and cannot be imported."
+      );
+      return;
+    }
+
+    const existingFolderIds = new Set(
+      folders.map((folder) => folder.id)
+    );
+
+    const existingNoteIds = new Set(
+      encryptedNotes.map((note) => note.id)
+    );
+
+    const duplicateFolderCount =
+      validFolders.filter((folder) =>
+        existingFolderIds.has(folder.id)
+      ).length;
+
+    const duplicateNoteCount =
+      validNotes.filter((note) =>
+        existingNoteIds.has(note.id)
+      ).length;
+
+    const duplicateMessage =
+      duplicateFolderCount ||
+      duplicateNoteCount
+        ? `\n\nThis backup contains ${duplicateNoteCount} existing article${
+            duplicateNoteCount === 1 ? "" : "s"
+          } and ${duplicateFolderCount} existing folder${
+            duplicateFolderCount === 1 ? "" : "s"
+          }. Existing items with the same IDs will be replaced.`
+        : "";
+
+    const confirmed = window.confirm(
+      `Import ${validNotes.length} article${
+        validNotes.length === 1 ? "" : "s"
+      } and ${validFolders.length} folder${
+        validFolders.length === 1 ? "" : "s"
+      }?${duplicateMessage}\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    const operations = [
+      ...validFolders.map((folder) => ({
+        type: "folder",
+        data: folder
+      })),
+
+      ...validNotes.map((note) => ({
+        type: "note",
+        data: note
+      }))
+    ];
+
+    // Keep each batch below Firestore's 500-write limit.
+    for (
+      let start = 0;
+      start < operations.length;
+      start += 450
+    ) {
+      const batch = writeBatch(db);
+
+      const chunk = operations.slice(
+        start,
+        start + 450
+      );
+
+      chunk.forEach((operation) => {
+        if (operation.type === "folder") {
+          const folder = operation.data;
+
+          batch.set(
+            doc(db, "folders", folder.id),
+            {
+              name: folder.name.trim(),
+              parentId:
+                folder.parentId ?? null,
+              userId: user.uid,
+              createdAt:
+                typeof folder.createdAt === "number"
+                  ? folder.createdAt
+                  : Date.now()
+            }
+          );
+
+          return;
+        }
+
+        const note = operation.data;
+
+        batch.set(
+          doc(db, "notes", note.id),
+          {
+            userId: user.uid,
+            folderId:
+              note.folderId ?? null,
+            title: encryptData(
+              note.title,
+              masterKey
+            ),
+            body: encryptData(
+              note.body,
+              masterKey
+            ),
+            updatedAt:
+              typeof note.updatedAt === "number"
+                ? note.updatedAt
+                : Date.now()
+          }
+        );
+      });
+
+      await batch.commit();
+    }
+
+    window.alert(
+      `Import complete.\n\n${validNotes.length} article${
+        validNotes.length === 1 ? "" : "s"
+      } and ${validFolders.length} folder${
+        validFolders.length === 1 ? "" : "s"
+      } imported.`
+    );
+  } catch (error) {
+    console.error(
+      "Failed to import ArchiWiki backup:",
+      error
+    );
+
+    window.alert(
+      "The backup could not be imported. Please check that it is a valid ArchiWiki backup."
+    );
+  } finally {
+    setIsImporting(false);
+  }
+};
 
   const getFolderPath = (folderId) => {
     if (!folderId) return "Root";
@@ -752,6 +983,7 @@ function ArchiWikiApp() {
 
   if (!user || requiresUnlock) {
     return (
+
       <div className="min-h-screen flex items-center justify-center bg-[#F5F2EB] text-[#202122] font-serif p-6">
         <div className="w-full max-w-md bg-white border border-neutral-300 rounded shadow-md p-8">
           <h2 className="text-2xl font-bold font-archi tracking-wider text-center mb-1">
@@ -881,9 +1113,20 @@ function ArchiWikiApp() {
   }
 
   return (
+
+    
     <div
       className={`h-screen flex overflow-hidden ${getThemeClasses()}`}
     >
+
+      <input
+  id="archiwiki-import-file"
+  type="file"
+  accept=".json,application/json"
+  className="hidden"
+  onChange={handleImportBackup}
+/>
+
       <div className="hidden md:block h-full">
         <Sidebar
           theme={theme}
@@ -1147,20 +1390,52 @@ function ArchiWikiApp() {
               </select>
             </div>
 
-            <button
-              onClick={exportAllToZip}
-              className={`flex py-1 px-2.5 border rounded items-center gap-1 ${shellTheme.button}`}
-            >
-              <Share2 size={12} />
+            <div className="relative">
+  <details className="relative">
+    <summary
+      className={`list-none cursor-pointer flex items-center py-1 px-2.5 border rounded gap-1 ${shellTheme.button}`}
+    >
+      <Share2 size={12} />
 
-              <span className="hidden sm:inline">
-                Backup (.json)
-              </span>
+      <span className="hidden sm:inline">
+        Backup
+      </span>
 
-              <span className="sm:hidden">
-                Backup
-              </span>
-            </button>
+      <span className="sm:hidden">
+        Backup
+      </span>
+
+      <ChevronDown size={12} />
+    </summary>
+
+    <div
+      className={`absolute right-0 mt-1 z-50 min-w-[160px] rounded border shadow-lg overflow-hidden ${shellTheme.select}`}
+    >
+      <button
+        type="button"
+        onClick={exportAllToZip}
+        className="w-full text-left px-3 py-2 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+      >
+        Export backup
+      </button>
+
+      <button
+        type="button"
+        disabled={isImporting}
+        onClick={() => {
+          document
+            .getElementById("archiwiki-import-file")
+            ?.click();
+        }}
+        className="w-full text-left px-3 py-2 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50"
+      >
+        {isImporting
+          ? "Importing..."
+          : "Import backup"}
+      </button>
+    </div>
+  </details>
+</div>
 
             <button
               onClick={handleLogout}
@@ -1487,6 +1762,7 @@ function App() {
   const [maintenance, setMaintenance] = useState(false);
   const [maintenanceChecked, setMaintenanceChecked] =
     useState(false);
+
 
   const [forcePwa, setForcePwa] =
     useState(false);
